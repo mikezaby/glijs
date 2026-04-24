@@ -11,6 +11,7 @@ export type BlockControls = {
   spread: number
   density: number
   size: number
+  noise: number
   randomness: number
 }
 
@@ -48,6 +49,7 @@ const DEFAULT_BLOCK_CONTROLS: BlockControls = {
   spread: 62,
   density: 58,
   size: 48,
+  noise: 0,
   randomness: 44,
 }
 
@@ -255,6 +257,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       spread: clamp(nextControls.spread, 0, 100),
       density: clamp(nextControls.density, 0, 100),
       size: clamp(nextControls.size, 0, 100),
+      noise: clamp(nextControls.noise, 0, 100),
       randomness: clamp(nextControls.randomness, 0, 100),
     }
   }
@@ -388,6 +391,7 @@ const drawImageLayers = (
   const spread = blockControls.spread / 100
   const density = blockControls.density / 100
   const size = blockControls.size / 100
+  const squareNoise = blockControls.noise / 100
   const randomness = blockControls.randomness / 100
 
   if (spread <= 0 || density <= 0) {
@@ -454,8 +458,49 @@ const drawImageLayers = (
       destSize,
       destSize,
     )
+    drawSquareNoise(instance, destX, destY, destSize, squareNoise, seed, metrics)
     instance.pop()
   }
+}
+
+const drawSquareNoise = (
+  instance: p5,
+  x: number,
+  y: number,
+  size: number,
+  amount: number,
+  seed: number,
+  metrics: GlitchMetrics,
+) => {
+  if (amount <= 0) {
+    return
+  }
+
+  const noiseCount = Math.round(mix(4, 90, amount) * (0.7 + metrics.treble))
+  const grainSize = Math.max(1, size * mix(0.012, 0.045, amount))
+
+  instance.push()
+  instance.noStroke()
+  for (let index = 0; index < noiseCount; index += 1) {
+    const grainX = x + hash01(seed + index * 5.31, 12.7) * size
+    const grainY = y + hash01(seed + index * 8.17, 44.9) * size
+    const alpha = 35 + amount * 155 * hash01(seed + index * 2.43, 72.5)
+    const warm = hash01(seed + index, 91.2) > 0.5
+
+    if (warm) {
+      instance.fill(255, 245, 210, alpha)
+    } else {
+      instance.fill(25, 35, 45, alpha)
+    }
+
+    instance.rect(
+      grainX,
+      grainY,
+      grainSize * mix(0.7, 3.2, hash01(seed + index, 101.4)),
+      grainSize,
+    )
+  }
+  instance.pop()
 }
 
 const drawOverlay = (instance: p5, metrics: GlitchMetrics) => {

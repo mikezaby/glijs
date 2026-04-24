@@ -74,6 +74,7 @@ export function loadStoredBlockControls(): Partial<BlockControls> | null {
       spread: normalizeControlValue(controls.spread),
       density: normalizeControlValue(controls.density),
       size: normalizeControlValue(controls.size),
+      noise: normalizeControlValue(controls.noise),
       randomness: normalizeControlValue(controls.randomness),
     }
   } catch {

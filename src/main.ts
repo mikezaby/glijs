@@ -15,6 +15,7 @@ const DEFAULT_BLOCK_CONTROLS: BlockControls = {
   spread: 62,
   density: 58,
   size: 48,
+  noise: 0,
   randomness: 44,
 }
 
@@ -127,6 +128,23 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 
         <label
           class="slider-field"
+          title="Low keeps squares clean. High adds more noise inside each square."
+        >
+          <div class="slider-field__head">
+            <span>Noise</span>
+            <strong data-noise-value>${DEFAULT_BLOCK_CONTROLS.noise}%</strong>
+          </div>
+          <input
+            data-noise-slider
+            type="range"
+            min="0"
+            max="100"
+            value="${DEFAULT_BLOCK_CONTROLS.noise}"
+          />
+        </label>
+
+        <label
+          class="slider-field"
           title="Low keeps positions stable. High makes blocks jump more often."
         >
           <div class="slider-field__head">
@@ -166,12 +184,14 @@ const sketchHost = document.querySelector<HTMLElement>('#sketch-host')!
 const spreadSlider = document.querySelector<HTMLInputElement>('[data-spread-slider]')!
 const densitySlider = document.querySelector<HTMLInputElement>('[data-density-slider]')!
 const sizeSlider = document.querySelector<HTMLInputElement>('[data-size-slider]')!
+const noiseSlider = document.querySelector<HTMLInputElement>('[data-noise-slider]')!
 const randomnessSlider = document.querySelector<HTMLInputElement>(
   '[data-randomness-slider]',
 )!
 const spreadValue = document.querySelector<HTMLElement>('[data-spread-value]')!
 const densityValue = document.querySelector<HTMLElement>('[data-density-value]')!
 const sizeValue = document.querySelector<HTMLElement>('[data-size-value]')!
+const noiseValue = document.querySelector<HTMLElement>('[data-noise-value]')!
 const randomnessValue = document.querySelector<HTMLElement>(
   '[data-randomness-value]',
 )!
@@ -190,6 +210,9 @@ const applyBlockControls = (controls: Partial<BlockControls>) => {
   if (typeof controls.size === 'number') {
     sizeSlider.value = String(controls.size)
   }
+  if (typeof controls.noise === 'number') {
+    noiseSlider.value = String(controls.noise)
+  }
   if (typeof controls.randomness === 'number') {
     randomnessSlider.value = String(controls.randomness)
   }
@@ -205,6 +228,7 @@ const readBlockControls = (): BlockControls => ({
   spread: Number(spreadSlider.value),
   density: Number(densitySlider.value),
   size: Number(sizeSlider.value),
+  noise: Number(noiseSlider.value),
   randomness: Number(randomnessSlider.value),
 })
 
@@ -213,6 +237,7 @@ const syncBlockControls = () => {
   spreadValue.textContent = `${controls.spread}%`
   densityValue.textContent = `${controls.density}%`
   sizeValue.textContent = `${controls.size}%`
+  noiseValue.textContent = `${controls.noise}%`
   randomnessValue.textContent = `${controls.randomness}%`
   sketch.setBlockControls(controls)
   saveStoredBlockControls(controls)
@@ -274,7 +299,13 @@ playButton.addEventListener('click', async () => {
   }
 })
 
-for (const slider of [spreadSlider, densitySlider, sizeSlider, randomnessSlider]) {
+for (const slider of [
+  spreadSlider,
+  densitySlider,
+  sizeSlider,
+  noiseSlider,
+  randomnessSlider,
+]) {
   slider.addEventListener('input', () => {
     syncBlockControls()
   })
