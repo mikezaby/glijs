@@ -129,6 +129,25 @@ input {
   gap: 12px;
 }
 
+.control-groups,
+.control-group {
+  display: grid;
+  gap: 12px;
+}
+
+.control-group {
+  padding-top: 4px;
+}
+
+.control-group h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .media-row {
   grid-template-columns: 1fr;
   align-items: stretch;

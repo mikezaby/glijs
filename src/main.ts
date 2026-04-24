@@ -17,7 +17,175 @@ const DEFAULT_BLOCK_CONTROLS: BlockControls = {
   size: 48,
   noise: 0,
   randomness: 44,
+  tearCount: 55,
+  tearHeight: 50,
+  tearShift: 65,
+  rgbAmount: 60,
+  rgbOpacity: 65,
+  scanlineDensity: 55,
+  scanlineOpacity: 45,
+  streakCount: 45,
+  streakLength: 60,
+  streakOpacity: 50,
+  backdropIntensity: 60,
 }
+
+type ControlKey = keyof BlockControls
+
+type ControlGroup = {
+  name: string
+  controls: Array<{
+    key: ControlKey
+    label: string
+    title: string
+  }>
+}
+
+const CONTROL_GROUPS: ControlGroup[] = [
+  {
+    name: 'Squares',
+    controls: [
+      {
+        key: 'spread',
+        label: 'Spread',
+        title: 'Low disables or centers squares. High spreads them across the canvas.',
+      },
+      {
+        key: 'density',
+        label: 'Density',
+        title: 'Controls total active square area.',
+      },
+      {
+        key: 'size',
+        label: 'Size',
+        title: 'Controls rendered square size.',
+      },
+      {
+        key: 'noise',
+        label: 'Noise',
+        title: 'Adds grain inside displaced squares.',
+      },
+      {
+        key: 'randomness',
+        label: 'Random',
+        title: 'Adds random movement on top of audio-derived positions.',
+      },
+    ],
+  },
+  {
+    name: 'Tears',
+    controls: [
+      {
+        key: 'tearCount',
+        label: 'Count',
+        title: 'Controls how many horizontal tears are drawn.',
+      },
+      {
+        key: 'tearHeight',
+        label: 'Height',
+        title: 'Controls tear slice thickness.',
+      },
+      {
+        key: 'tearShift',
+        label: 'Shift',
+        title: 'Controls horizontal tear displacement.',
+      },
+    ],
+  },
+  {
+    name: 'RGB Split',
+    controls: [
+      {
+        key: 'rgbAmount',
+        label: 'Amount',
+        title: 'Controls red/cyan channel offset.',
+      },
+      {
+        key: 'rgbOpacity',
+        label: 'Opacity',
+        title: 'Controls channel split visibility.',
+      },
+    ],
+  },
+  {
+    name: 'Scanlines',
+    controls: [
+      {
+        key: 'scanlineDensity',
+        label: 'Density',
+        title: 'Controls scanline spacing.',
+      },
+      {
+        key: 'scanlineOpacity',
+        label: 'Opacity',
+        title: 'Controls scanline visibility.',
+      },
+    ],
+  },
+  {
+    name: 'Streaks',
+    controls: [
+      {
+        key: 'streakCount',
+        label: 'Count',
+        title: 'Controls how many streaks are drawn.',
+      },
+      {
+        key: 'streakLength',
+        label: 'Length',
+        title: 'Controls streak width.',
+      },
+      {
+        key: 'streakOpacity',
+        label: 'Opacity',
+        title: 'Controls streak visibility.',
+      },
+    ],
+  },
+  {
+    name: 'Backdrop',
+    controls: [
+      {
+        key: 'backdropIntensity',
+        label: 'Intensity',
+        title: 'Controls background pulse and glow strength.',
+      },
+    ],
+  },
+]
+
+const CONTROL_KEYS = CONTROL_GROUPS.flatMap((group) =>
+  group.controls.map((control) => control.key),
+)
+
+const renderControlGroup = (group: ControlGroup) => `
+  <section class="control-group">
+    <h2>${group.name}</h2>
+    <div class="settings-row slider-row">
+      ${group.controls
+        .map(
+          (control) => `
+            <label class="slider-field" title="${control.title}">
+              <div class="slider-field__head">
+                <span>${control.label}</span>
+                <strong data-control-value="${control.key}">
+                  ${DEFAULT_BLOCK_CONTROLS[control.key]}%
+                </strong>
+              </div>
+              <input
+                data-control-slider="${control.key}"
+                type="range"
+                min="0"
+                max="100"
+                value="${DEFAULT_BLOCK_CONTROLS[control.key]}"
+              />
+            </label>
+          `,
+        )
+        .join('')}
+    </div>
+  </section>
+`
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <main class="shell">
@@ -74,91 +242,8 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 
       <p class="status" data-status>Load image and WAV.</p>
 
-      <div class="settings-row slider-row">
-        <label
-          class="slider-field"
-          title="Low keeps squares near center. High spreads them across the image."
-        >
-          <div class="slider-field__head">
-            <span>Spread</span>
-            <strong data-spread-value>${DEFAULT_BLOCK_CONTROLS.spread}%</strong>
-          </div>
-          <input
-            data-spread-slider
-            type="range"
-            min="0"
-            max="100"
-            value="${DEFAULT_BLOCK_CONTROLS.spread}"
-          />
-        </label>
-
-        <label
-          class="slider-field"
-          title="Low creates fewer blocks. High creates more nearby blocks."
-        >
-          <div class="slider-field__head">
-            <span>Density</span>
-            <strong data-density-value>${DEFAULT_BLOCK_CONTROLS.density}%</strong>
-          </div>
-          <input
-            data-density-slider
-            type="range"
-            min="0"
-            max="100"
-            value="${DEFAULT_BLOCK_CONTROLS.density}"
-          />
-        </label>
-
-        <label
-          class="slider-field"
-          title="Low makes smaller squares. High makes larger squares."
-        >
-          <div class="slider-field__head">
-            <span>Size</span>
-            <strong data-size-value>${DEFAULT_BLOCK_CONTROLS.size}%</strong>
-          </div>
-          <input
-            data-size-slider
-            type="range"
-            min="0"
-            max="100"
-            value="${DEFAULT_BLOCK_CONTROLS.size}"
-          />
-        </label>
-
-        <label
-          class="slider-field"
-          title="Low keeps squares clean. High adds more noise inside each square."
-        >
-          <div class="slider-field__head">
-            <span>Noise</span>
-            <strong data-noise-value>${DEFAULT_BLOCK_CONTROLS.noise}%</strong>
-          </div>
-          <input
-            data-noise-slider
-            type="range"
-            min="0"
-            max="100"
-            value="${DEFAULT_BLOCK_CONTROLS.noise}"
-          />
-        </label>
-
-        <label
-          class="slider-field"
-          title="Low keeps positions stable. High makes blocks jump more often."
-        >
-          <div class="slider-field__head">
-            <span>Random</span>
-            <strong data-randomness-value>${DEFAULT_BLOCK_CONTROLS.randomness}%</strong>
-          </div>
-          <input
-            data-randomness-slider
-            type="range"
-            min="0"
-            max="100"
-            value="${DEFAULT_BLOCK_CONTROLS.randomness}"
-          />
-        </label>
+      <div class="control-groups">
+        ${CONTROL_GROUPS.map(renderControlGroup).join('')}
       </div>
     </aside>
   </main>
@@ -181,40 +266,31 @@ const currentTime = document.querySelector<HTMLElement>('[data-current-time]')!
 const duration = document.querySelector<HTMLElement>('[data-duration]')!
 const progress = document.querySelector<HTMLElement>('[data-progress]')!
 const sketchHost = document.querySelector<HTMLElement>('#sketch-host')!
-const spreadSlider = document.querySelector<HTMLInputElement>('[data-spread-slider]')!
-const densitySlider = document.querySelector<HTMLInputElement>('[data-density-slider]')!
-const sizeSlider = document.querySelector<HTMLInputElement>('[data-size-slider]')!
-const noiseSlider = document.querySelector<HTMLInputElement>('[data-noise-slider]')!
-const randomnessSlider = document.querySelector<HTMLInputElement>(
-  '[data-randomness-slider]',
-)!
-const spreadValue = document.querySelector<HTMLElement>('[data-spread-value]')!
-const densityValue = document.querySelector<HTMLElement>('[data-density-value]')!
-const sizeValue = document.querySelector<HTMLElement>('[data-size-value]')!
-const noiseValue = document.querySelector<HTMLElement>('[data-noise-value]')!
-const randomnessValue = document.querySelector<HTMLElement>(
-  '[data-randomness-value]',
-)!
+const controlSliders = new Map<ControlKey, HTMLInputElement>()
+const controlValues = new Map<ControlKey, HTMLElement>()
+
+for (const key of CONTROL_KEYS) {
+  controlSliders.set(
+    key,
+    document.querySelector<HTMLInputElement>(`[data-control-slider="${key}"]`)!,
+  )
+  controlValues.set(
+    key,
+    document.querySelector<HTMLElement>(`[data-control-value="${key}"]`)!,
+  )
+}
 
 const sketch = await createGlitchSketch({
   host: sketchHost,
 })
 
 const applyBlockControls = (controls: Partial<BlockControls>) => {
-  if (typeof controls.spread === 'number') {
-    spreadSlider.value = String(controls.spread)
-  }
-  if (typeof controls.density === 'number') {
-    densitySlider.value = String(controls.density)
-  }
-  if (typeof controls.size === 'number') {
-    sizeSlider.value = String(controls.size)
-  }
-  if (typeof controls.noise === 'number') {
-    noiseSlider.value = String(controls.noise)
-  }
-  if (typeof controls.randomness === 'number') {
-    randomnessSlider.value = String(controls.randomness)
+  for (const key of CONTROL_KEYS) {
+    const value = controls[key]
+
+    if (typeof value === 'number') {
+      controlSliders.get(key)!.value = String(value)
+    }
   }
 }
 
@@ -224,21 +300,23 @@ const setSettingsOpen = (open: boolean) => {
   settingsToggle.textContent = open ? 'Hide settings' : 'Settings'
 }
 
-const readBlockControls = (): BlockControls => ({
-  spread: Number(spreadSlider.value),
-  density: Number(densitySlider.value),
-  size: Number(sizeSlider.value),
-  noise: Number(noiseSlider.value),
-  randomness: Number(randomnessSlider.value),
-})
+const readBlockControls = (): BlockControls => {
+  return CONTROL_KEYS.reduce<BlockControls>(
+    (controls, key) => ({
+      ...controls,
+      [key]: Number(controlSliders.get(key)!.value),
+    }),
+    { ...DEFAULT_BLOCK_CONTROLS },
+  )
+}
 
 const syncBlockControls = () => {
   const controls = readBlockControls()
-  spreadValue.textContent = `${controls.spread}%`
-  densityValue.textContent = `${controls.density}%`
-  sizeValue.textContent = `${controls.size}%`
-  noiseValue.textContent = `${controls.noise}%`
-  randomnessValue.textContent = `${controls.randomness}%`
+
+  for (const key of CONTROL_KEYS) {
+    controlValues.get(key)!.textContent = `${controls[key]}%`
+  }
+
   sketch.setBlockControls(controls)
   saveStoredBlockControls(controls)
 }
@@ -299,13 +377,7 @@ playButton.addEventListener('click', async () => {
   }
 })
 
-for (const slider of [
-  spreadSlider,
-  densitySlider,
-  sizeSlider,
-  noiseSlider,
-  randomnessSlider,
-]) {
+for (const slider of controlSliders.values()) {
   slider.addEventListener('input', () => {
     syncBlockControls()
   })

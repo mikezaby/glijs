@@ -13,6 +13,17 @@ export type BlockControls = {
   size: number
   noise: number
   randomness: number
+  tearCount: number
+  tearHeight: number
+  tearShift: number
+  rgbAmount: number
+  rgbOpacity: number
+  scanlineDensity: number
+  scanlineOpacity: number
+  streakCount: number
+  streakLength: number
+  streakOpacity: number
+  backdropIntensity: number
 }
 
 type Snapshot = {
@@ -51,6 +62,17 @@ const DEFAULT_BLOCK_CONTROLS: BlockControls = {
   size: 48,
   noise: 0,
   randomness: 44,
+  tearCount: 55,
+  tearHeight: 50,
+  tearShift: 65,
+  rgbAmount: 60,
+  rgbOpacity: 65,
+  scanlineDensity: 55,
+  scanlineOpacity: 45,
+  streakCount: 45,
+  streakLength: 60,
+  streakOpacity: 50,
+  backdropIntensity: 60,
 }
 
 export function formatTime(seconds: number): string {
@@ -102,7 +124,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       metrics = readMetrics()
 
       instance.background('#07111f')
-      drawBackdrop(instance, metrics)
+      drawBackdrop(instance, metrics, blockControls)
 
       if (loadedImage) {
         drawImageLayers(
@@ -120,7 +142,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
         drawPlaceholder(instance, metrics)
       }
 
-      drawOverlay(instance, metrics)
+      drawOverlay(instance, metrics, blockControls)
       options.onMetrics?.(metrics)
     }
   }
@@ -259,6 +281,17 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       size: clamp(nextControls.size, 0, 100),
       noise: clamp(nextControls.noise, 0, 100),
       randomness: clamp(nextControls.randomness, 0, 100),
+      tearCount: clamp(nextControls.tearCount, 0, 100),
+      tearHeight: clamp(nextControls.tearHeight, 0, 100),
+      tearShift: clamp(nextControls.tearShift, 0, 100),
+      rgbAmount: clamp(nextControls.rgbAmount, 0, 100),
+      rgbOpacity: clamp(nextControls.rgbOpacity, 0, 100),
+      scanlineDensity: clamp(nextControls.scanlineDensity, 0, 100),
+      scanlineOpacity: clamp(nextControls.scanlineOpacity, 0, 100),
+      streakCount: clamp(nextControls.streakCount, 0, 100),
+      streakLength: clamp(nextControls.streakLength, 0, 100),
+      streakOpacity: clamp(nextControls.streakOpacity, 0, 100),
+      backdropIntensity: clamp(nextControls.backdropIntensity, 0, 100),
     }
   }
 
@@ -298,22 +331,40 @@ const resizeIfNeeded = (instance: p5, host: HTMLElement) => {
   }
 }
 
-const drawBackdrop = (instance: p5, metrics: GlitchMetrics) => {
-  const pulse = 0.12 + metrics.level * 0.28
+const drawBackdrop = (
+  instance: p5,
+  metrics: GlitchMetrics,
+  blockControls: BlockControls,
+) => {
+  const intensity = blockControls.backdropIntensity / 100
+
+  if (intensity <= 0) {
+    return
+  }
+
+  const pulse = (0.12 + metrics.level * 0.28) * intensity
 
   for (let index = 0; index < 7; index += 1) {
     const y = (index / 6) * instance.height
-    const alpha = 14 + index * 6 + metrics.treble * 18
+    const alpha = (14 + index * 6 + metrics.treble * 18) * intensity
     instance.fill(14, 48 + index * 10, 74 + pulse * 100, alpha)
     instance.rect(0, y, instance.width, instance.height / 8)
   }
 
   instance.push()
   instance.blendMode(instance.ADD)
-  instance.fill(255, 110, 62, 30 + metrics.bass * 55)
-  instance.circle(instance.width * 0.18, instance.height * 0.2, 220 + metrics.bass * 180)
-  instance.fill(72, 188, 255, 28 + metrics.treble * 60)
-  instance.circle(instance.width * 0.86, instance.height * 0.72, 260 + metrics.chaos * 220)
+  instance.fill(255, 110, 62, (30 + metrics.bass * 55) * intensity)
+  instance.circle(
+    instance.width * 0.18,
+    instance.height * 0.2,
+    (220 + metrics.bass * 180) * mix(0.35, 1, intensity),
+  )
+  instance.fill(72, 188, 255, (28 + metrics.treble * 60) * intensity)
+  instance.circle(
+    instance.width * 0.86,
+    instance.height * 0.72,
+    (260 + metrics.chaos * 220) * mix(0.35, 1, intensity),
+  )
   instance.pop()
 }
 
@@ -345,11 +396,19 @@ const drawImageLayers = (
   audioData: AudioData,
 ) => {
   const bounds = getCoverBounds(image.width, image.height, instance.width * 0.84, instance.height * 0.8)
+  const rgbAmount = blockControls.rgbAmount / 100
+  const rgbOpacity = blockControls.rgbOpacity / 100
+  const rgbState = getRgbSplitState(audioData, metrics, audioTime)
   const centerX = instance.width / 2 + Math.sin(audioTime * 1.7) * metrics.bass * 14
   const centerY = instance.height / 2 + Math.cos(audioTime * 2.2) * metrics.level * 10
   const x = centerX - bounds.width / 2
   const y = centerY - bounds.height / 2
-  const channelOffset = 6 + metrics.treble * 24
+  const channelOffset =
+    (4 + metrics.treble * 38 + metrics.level * 22 + metrics.bass * 12) *
+    rgbAmount *
+    rgbState.pulse
+  const splitX = Math.cos(rgbState.angle) * channelOffset
+  const splitY = Math.sin(rgbState.angle) * channelOffset
 
   instance.push()
   instance.blendMode(instance.BLEND)
@@ -357,23 +416,47 @@ const drawImageLayers = (
   instance.image(image, x, y, bounds.width, bounds.height)
   instance.pop()
 
-  instance.push()
-  instance.blendMode(instance.ADD)
-  instance.tint(255, 88, 72, 78 + metrics.chaos * 90)
-  instance.image(image, x - channelOffset, y, bounds.width, bounds.height)
-  instance.tint(72, 210, 255, 70 + metrics.treble * 120)
-  instance.image(image, x + channelOffset, y + metrics.level * 8, bounds.width, bounds.height)
-  instance.pop()
+  if (rgbAmount > 0 && rgbOpacity > 0) {
+    instance.push()
+    instance.blendMode(instance.ADD)
+    instance.tint(255, 56, 42, (62 + metrics.chaos * 120) * rgbOpacity * rgbState.opacity)
+    instance.image(image, x - splitX, y - splitY, bounds.width, bounds.height)
+    instance.tint(58, 255, 128, (34 + metrics.level * 90) * rgbOpacity * rgbState.opacity)
+    instance.image(
+      image,
+      x + splitY * 0.75,
+      y - splitX * 0.75,
+      bounds.width,
+      bounds.height,
+    )
+    instance.tint(62, 196, 255, (64 + metrics.treble * 145) * rgbOpacity * rgbState.opacity)
+    instance.image(
+      image,
+      x + splitX * 1.1,
+      y + splitY * 1.1 + metrics.level * 10,
+      bounds.width,
+      bounds.height,
+    )
+    instance.pop()
+  }
 
-  const tearCount = Math.max(2, Math.round(3 + metrics.bass * 10))
+  const tearCountControl = blockControls.tearCount / 100
+  const tearHeightControl = blockControls.tearHeight / 100
+  const tearShiftControl = blockControls.tearShift / 100
+  const tearCount = Math.round((2 + metrics.bass * 12) * tearCountControl)
   for (let index = 0; index < tearCount; index += 1) {
     const seed = audioTime * 0.8 + index * 0.2
     const normalizedY = instance.noise(seed, metrics.chaos * 5)
     const sliceSourceY = normalizedY * image.height * 0.92
-    const sliceHeight = Math.max(18, image.height * (0.035 + metrics.level * 0.08))
+    const sliceHeight = Math.max(
+      1,
+      image.height * mix(0.01, 0.12, tearHeightControl) * (0.65 + metrics.level),
+    )
     const sliceDestY = y + normalizedY * bounds.height
     const shift =
-      (instance.noise(seed * 2.8, 2.4) - 0.5) * (40 + metrics.bass * 180)
+      (instance.noise(seed * 2.8, 2.4) - 0.5) *
+      (40 + metrics.bass * 180) *
+      tearShiftControl
 
     instance.copy(
       image,
@@ -503,23 +586,61 @@ const drawSquareNoise = (
   instance.pop()
 }
 
-const drawOverlay = (instance: p5, metrics: GlitchMetrics) => {
-  const scanlineGap = 6
+const getRgbSplitState = (
+  audioData: AudioData,
+  metrics: GlitchMetrics,
+  audioTime: number,
+) => {
+  const low = sampleAudioData(audioData.frequencies, fract(audioTime * 0.071))
+  const mid = sampleAudioData(audioData.frequencies, fract(0.33 + audioTime * 0.113))
+  const high = sampleAudioData(audioData.frequencies, fract(0.72 + audioTime * 0.167))
+  const waveA = sampleAudioData(audioData.waveform, fract(audioTime * 0.191))
+  const waveB = sampleAudioData(audioData.waveform, fract(0.57 + audioTime * 0.137))
+  const audioFlux =
+    Math.abs(high - low) * 0.95 +
+    Math.abs(waveA - waveB) * 0.85 +
+    metrics.level * 0.75 +
+    metrics.treble * 0.55
+  const angle =
+    (waveA - 0.5) * Math.PI * 1.5 +
+    (mid - 0.5) * Math.PI +
+    Math.sin(audioTime * (3.5 + high * 8)) * 0.45
+
+  return {
+    angle,
+    pulse: clamp(0.35 + audioFlux * 1.85, 0.2, 2.8),
+    opacity: clamp(0.55 + audioFlux * 1.15, 0.35, 1.85),
+  }
+}
+
+const drawOverlay = (
+  instance: p5,
+  metrics: GlitchMetrics,
+  blockControls: BlockControls,
+) => {
+  const scanlineDensity = blockControls.scanlineDensity / 100
+  const scanlineOpacity = blockControls.scanlineOpacity / 100
+  const streakCountControl = blockControls.streakCount / 100
+  const streakLength = blockControls.streakLength / 100
+  const streakOpacity = blockControls.streakOpacity / 100
+  const scanlineGap = Math.round(mix(18, 3, scanlineDensity))
 
   instance.push()
-  for (let y = 0; y < instance.height; y += scanlineGap) {
-    const alpha = 15 + metrics.treble * 26 + (y % 12 === 0 ? 12 : 0)
-    instance.fill(255, 255, 255, alpha)
-    instance.rect(0, y, instance.width, 1)
+  if (scanlineDensity > 0 && scanlineOpacity > 0) {
+    for (let y = 0; y < instance.height; y += scanlineGap) {
+      const alpha = (15 + metrics.treble * 26 + (y % 12 === 0 ? 12 : 0)) * scanlineOpacity
+      instance.fill(255, 255, 255, alpha)
+      instance.rect(0, y, instance.width, 1)
+    }
   }
 
-  const streaks = Math.max(4, Math.round(8 + metrics.chaos * 18))
+  const streaks = Math.round((4 + metrics.chaos * 24) * streakCountControl)
   for (let index = 0; index < streaks; index += 1) {
     const noiseValue = instance.noise(index * 0.8, instance.frameCount * 0.02)
     const streakY = noiseValue * instance.height
-    const streakWidth = instance.width * (0.22 + metrics.level * 0.6)
+    const streakWidth = instance.width * mix(0.06, 0.85, streakLength) * (0.55 + metrics.level)
     const streakX = (instance.noise(index * 1.4, instance.frameCount * 0.02 + 9) - 0.2) * instance.width
-    instance.fill(255, 134, 92, 12 + metrics.bass * 45)
+    instance.fill(255, 134, 92, (12 + metrics.bass * 45) * streakOpacity)
     instance.rect(streakX, streakY, streakWidth, 2 + metrics.level * 3)
   }
 

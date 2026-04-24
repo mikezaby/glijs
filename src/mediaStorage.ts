@@ -76,6 +76,17 @@ export function loadStoredBlockControls(): Partial<BlockControls> | null {
       size: normalizeControlValue(controls.size),
       noise: normalizeControlValue(controls.noise),
       randomness: normalizeControlValue(controls.randomness),
+      tearCount: normalizeControlValue(controls.tearCount),
+      tearHeight: normalizeControlValue(controls.tearHeight),
+      tearShift: normalizeControlValue(controls.tearShift),
+      rgbAmount: normalizeControlValue(controls.rgbAmount),
+      rgbOpacity: normalizeControlValue(controls.rgbOpacity),
+      scanlineDensity: normalizeControlValue(controls.scanlineDensity),
+      scanlineOpacity: normalizeControlValue(controls.scanlineOpacity),
+      streakCount: normalizeControlValue(controls.streakCount),
+      streakLength: normalizeControlValue(controls.streakLength),
+      streakOpacity: normalizeControlValue(controls.streakOpacity),
+      backdropIntensity: normalizeControlValue(controls.backdropIntensity),
     }
   } catch {
     localStorage.removeItem(BLOCK_CONTROLS_KEY)
