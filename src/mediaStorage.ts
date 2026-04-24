@@ -1,3 +1,5 @@
+import type { BlockControls } from './glitchSketch'
+
 type StoredMediaKind = 'image' | 'audio'
 
 type StoredMediaManifest = {
@@ -16,6 +18,7 @@ const DB_NAME = 'glijs-media-store'
 const STORE_NAME = 'files'
 const DB_VERSION = 1
 const MANIFEST_KEY = 'glijs:selected-media'
+const BLOCK_CONTROLS_KEY = 'glijs:block-controls'
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -51,6 +54,32 @@ export async function loadStoredMedia(kind: StoredMediaKind): Promise<File | nul
   }
 
   return file
+}
+
+export function saveStoredBlockControls(controls: BlockControls) {
+  localStorage.setItem(BLOCK_CONTROLS_KEY, JSON.stringify(controls))
+}
+
+export function loadStoredBlockControls(): Partial<BlockControls> | null {
+  const rawControls = localStorage.getItem(BLOCK_CONTROLS_KEY)
+
+  if (!rawControls) {
+    return null
+  }
+
+  try {
+    const controls = JSON.parse(rawControls) as Partial<BlockControls>
+
+    return {
+      spread: normalizeControlValue(controls.spread),
+      density: normalizeControlValue(controls.density),
+      size: normalizeControlValue(controls.size),
+      randomness: normalizeControlValue(controls.randomness),
+    }
+  } catch {
+    localStorage.removeItem(BLOCK_CONTROLS_KEY)
+    return null
+  }
 }
 
 const openMediaDb = () => {
@@ -122,4 +151,10 @@ const readManifest = (): StoredMediaManifest => {
 
 const writeManifest = (manifest: StoredMediaManifest) => {
   localStorage.setItem(MANIFEST_KEY, JSON.stringify(manifest))
+}
+
+const normalizeControlValue = (value: unknown) => {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(100, Math.max(0, value))
+    : undefined
 }

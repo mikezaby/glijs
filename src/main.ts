@@ -4,11 +4,17 @@ import {
   formatTime,
   type BlockControls,
 } from './glitchSketch'
-import { loadStoredMedia, saveStoredMedia } from './mediaStorage'
+import {
+  loadStoredBlockControls,
+  loadStoredMedia,
+  saveStoredBlockControls,
+  saveStoredMedia,
+} from './mediaStorage'
 
 const DEFAULT_BLOCK_CONTROLS: BlockControls = {
   spread: 62,
   density: 58,
+  size: 48,
   randomness: 44,
 }
 
@@ -104,6 +110,23 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 
         <label
           class="slider-field"
+          title="Low makes smaller squares. High makes larger squares."
+        >
+          <div class="slider-field__head">
+            <span>Size</span>
+            <strong data-size-value>${DEFAULT_BLOCK_CONTROLS.size}%</strong>
+          </div>
+          <input
+            data-size-slider
+            type="range"
+            min="0"
+            max="100"
+            value="${DEFAULT_BLOCK_CONTROLS.size}"
+          />
+        </label>
+
+        <label
+          class="slider-field"
           title="Low keeps positions stable. High makes blocks jump more often."
         >
           <div class="slider-field__head">
@@ -142,11 +165,13 @@ const progress = document.querySelector<HTMLElement>('[data-progress]')!
 const sketchHost = document.querySelector<HTMLElement>('#sketch-host')!
 const spreadSlider = document.querySelector<HTMLInputElement>('[data-spread-slider]')!
 const densitySlider = document.querySelector<HTMLInputElement>('[data-density-slider]')!
+const sizeSlider = document.querySelector<HTMLInputElement>('[data-size-slider]')!
 const randomnessSlider = document.querySelector<HTMLInputElement>(
   '[data-randomness-slider]',
 )!
 const spreadValue = document.querySelector<HTMLElement>('[data-spread-value]')!
 const densityValue = document.querySelector<HTMLElement>('[data-density-value]')!
+const sizeValue = document.querySelector<HTMLElement>('[data-size-value]')!
 const randomnessValue = document.querySelector<HTMLElement>(
   '[data-randomness-value]',
 )!
@@ -154,6 +179,21 @@ const randomnessValue = document.querySelector<HTMLElement>(
 const sketch = await createGlitchSketch({
   host: sketchHost,
 })
+
+const applyBlockControls = (controls: Partial<BlockControls>) => {
+  if (typeof controls.spread === 'number') {
+    spreadSlider.value = String(controls.spread)
+  }
+  if (typeof controls.density === 'number') {
+    densitySlider.value = String(controls.density)
+  }
+  if (typeof controls.size === 'number') {
+    sizeSlider.value = String(controls.size)
+  }
+  if (typeof controls.randomness === 'number') {
+    randomnessSlider.value = String(controls.randomness)
+  }
+}
 
 const setSettingsOpen = (open: boolean) => {
   settingsPanel.classList.toggle('is-open', open)
@@ -164,6 +204,7 @@ const setSettingsOpen = (open: boolean) => {
 const readBlockControls = (): BlockControls => ({
   spread: Number(spreadSlider.value),
   density: Number(densitySlider.value),
+  size: Number(sizeSlider.value),
   randomness: Number(randomnessSlider.value),
 })
 
@@ -171,8 +212,10 @@ const syncBlockControls = () => {
   const controls = readBlockControls()
   spreadValue.textContent = `${controls.spread}%`
   densityValue.textContent = `${controls.density}%`
+  sizeValue.textContent = `${controls.size}%`
   randomnessValue.textContent = `${controls.randomness}%`
   sketch.setBlockControls(controls)
+  saveStoredBlockControls(controls)
 }
 
 settingsToggle.addEventListener('click', () => {
@@ -231,7 +274,7 @@ playButton.addEventListener('click', async () => {
   }
 })
 
-for (const slider of [spreadSlider, densitySlider, randomnessSlider]) {
+for (const slider of [spreadSlider, densitySlider, sizeSlider, randomnessSlider]) {
   slider.addEventListener('input', () => {
     syncBlockControls()
   })
@@ -297,6 +340,7 @@ const restoreStoredMedia = async () => {
   syncUi()
 }
 
+applyBlockControls(loadStoredBlockControls() ?? DEFAULT_BLOCK_CONTROLS)
 syncBlockControls()
 syncUi()
 void restoreStoredMedia()

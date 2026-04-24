@@ -10,6 +10,7 @@ export type GlitchMetrics = {
 export type BlockControls = {
   spread: number
   density: number
+  size: number
   randomness: number
 }
 
@@ -46,6 +47,7 @@ const EMPTY_METRICS: GlitchMetrics = {
 const DEFAULT_BLOCK_CONTROLS: BlockControls = {
   spread: 62,
   density: 58,
+  size: 48,
   randomness: 44,
 }
 
@@ -252,6 +254,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     blockControls = {
       spread: clamp(nextControls.spread, 0, 100),
       density: clamp(nextControls.density, 0, 100),
+      size: clamp(nextControls.size, 0, 100),
       randomness: clamp(nextControls.randomness, 0, 100),
     }
   }
@@ -384,19 +387,25 @@ const drawImageLayers = (
 
   const spread = blockControls.spread / 100
   const density = blockControls.density / 100
+  const size = blockControls.size / 100
   const randomness = blockControls.randomness / 100
+
+  if (spread <= 0 || density <= 0) {
+    return
+  }
+
   const blockX = 0
   const blockY = 0
   const blockWidth = instance.width
   const blockHeight = instance.height
+  const destSize = Math.min(blockWidth, blockHeight) * mix(0.04, 0.18, size)
+  const targetCoverage = blockWidth * blockHeight * density
   const blockCount = Math.max(
-    2,
-    Math.round(mix(4, 48, density) * (0.85 + metrics.level * 0.65)),
+    1,
+    Math.ceil(targetCoverage / (destSize * destSize)),
   )
   const spreadRange = mix(0.08, 1, spread)
   const randomPhase = Math.floor(audioTime * mix(0.8, 12, randomness))
-  const baseSize = Math.min(blockWidth, blockHeight) * mix(0.035, 0.085, density)
-  const destSize = baseSize * (0.85 + metrics.bass * 0.8)
   const randomTravel = Math.min(blockWidth, blockHeight) * mix(0, 0.46, randomness)
 
   for (let index = 0; index < blockCount; index += 1) {
@@ -418,7 +427,7 @@ const drawImageLayers = (
       blockY,
       blockY + blockHeight - destSize,
     )
-    const sourceSize = image.width * (0.04 + metrics.chaos * 0.08)
+    const sourceSize = Math.min(image.width, image.height) * mix(0.9, 1.2, metrics.chaos) * (destSize / Math.min(blockWidth, blockHeight))
     const sourceAnchor = getLocalSourceRect({
       destX,
       destY,
@@ -515,16 +524,26 @@ const getAudioBlockPosition = (
   blockCount: number,
   audioData: AudioData,
 ) => {
-  const laneU = ((index + 0.5) / blockCount + hash01(index, 9.4) * 0.13) % 1
+  const laneU = fract(index * 0.61803398875 + hash01(index, 9.4) * 0.08)
   const laneV = hash01(index, 27.8)
-  const frequencyValue = sampleAudioData(audioData.frequencies, laneU)
-  const waveformValue = sampleAudioData(audioData.waveform, laneV)
-  const frequencyOffset = (frequencyValue - 0.5) / blockCount
-  const waveformOffset = (waveformValue - 0.5) / Math.max(3, blockCount * 0.33)
+  const frequencyValue = sampleAudioData(
+    audioData.frequencies,
+    fract(laneU + hash01(index, 63.1) * 0.2),
+  )
+  const waveformValue = sampleAudioData(
+    audioData.waveform,
+    fract(laneV + hash01(index, 91.7) * 0.2),
+  )
+  const crossValue = sampleAudioData(
+    audioData.frequencies,
+    fract((index + 0.5) / blockCount + waveformValue * 0.31),
+  )
+  const audioU = (frequencyValue - 0.5) * 0.42 + (crossValue - 0.5) * 0.18
+  const audioV = (waveformValue - 0.5) * 0.42 + (frequencyValue - 0.5) * 0.18
 
   return {
-    u: wrap01(laneU + frequencyOffset),
-    v: wrap01(laneV + waveformOffset),
+    u: wrap01(laneU + audioU),
+    v: wrap01(laneV + audioV),
     sourceU: frequencyValue,
     sourceV: waveformValue,
   }
