@@ -30,6 +30,7 @@ type Snapshot = {
   hasImage: boolean
   hasAudio: boolean
   playing: boolean
+  recording: boolean
   currentTime: number
   duration: number
 }
@@ -37,6 +38,7 @@ type Snapshot = {
 type CreateGlitchSketchOptions = {
   host: HTMLElement
   onMetrics?: (metrics: GlitchMetrics) => void
+  onRecordingComplete?: (recording: Blob) => void
 }
 
 type CoverBounds = {
@@ -55,6 +57,13 @@ const EMPTY_METRICS: GlitchMetrics = {
   treble: 0,
   chaos: 0,
 }
+
+const VIDEO_MIME_TYPES = [
+  'video/webm;codecs=vp9,opus',
+  'video/webm;codecs=vp8,opus',
+  'video/webm;codecs=h264,opus',
+  'video/webm',
+]
 
 const DEFAULT_BLOCK_CONTROLS: BlockControls = {
   spread: 62,
@@ -101,9 +110,19 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   let imageFileUrl: string | null = null
   let audioFileUrl: string | null = null
   let loadedImage: p5.Image | null = null
+  let canvasElement: HTMLCanvasElement | null = null
   let metrics: GlitchMetrics = { ...EMPTY_METRICS }
   let sketchInstance: p5 | null = null
   let blockControls: BlockControls = { ...DEFAULT_BLOCK_CONTROLS }
+  let recorderDestination: MediaStreamAudioDestinationNode | null = null
+  let recorderDestinationConnected = false
+  let mediaRecorder: MediaRecorder | null = null
+  let recordingStream: MediaStream | null = null
+  let recordingChunks: Blob[] = []
+  let stopRecordingPromise: Promise<void> | null = null
+  let resolveStopRecording: (() => void) | null = null
+  let rejectStopRecording: ((error: Error) => void) | null = null
+  let handleRecordingAudioEnded: (() => void) | null = null
 
   const sketch = (instance: p5) => {
     sketchInstance = instance
@@ -114,6 +133,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
         options.host.clientHeight,
       )
       canvas.parent(options.host)
+      canvasElement = canvas.elt as HTMLCanvasElement
       instance.pixelDensity(1)
       instance.noStroke()
       instance.noiseDetail(3, 0.45)
@@ -266,10 +286,135 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     audio.pause()
   }
 
+  const cleanupRecording = () => {
+    if (handleRecordingAudioEnded) {
+      audio.removeEventListener('ended', handleRecordingAudioEnded)
+      handleRecordingAudioEnded = null
+    }
+
+    recordingStream?.getVideoTracks().forEach((track) => {
+      track.stop()
+    })
+    recordingStream = null
+    mediaRecorder = null
+    recordingChunks = []
+  }
+
+  const startVideoRecording = async () => {
+    if (!loadedImage) {
+      throw new Error('Load an image before recording.')
+    }
+
+    if (!audio.src) {
+      throw new Error('Load a WAV file before recording.')
+    }
+
+    if (!canvasElement?.captureStream || typeof MediaRecorder === 'undefined') {
+      throw new Error('Video recording is not supported in this browser.')
+    }
+
+    if (mediaRecorder?.state === 'recording') {
+      return
+    }
+
+    ensureAudioGraph()
+
+    if (!audioContext || !analyser) {
+      throw new Error('Audio graph is unavailable.')
+    }
+
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume()
+    }
+
+    if (!recorderDestination) {
+      recorderDestination = audioContext.createMediaStreamDestination()
+    }
+
+    if (!recorderDestinationConnected) {
+      analyser.connect(recorderDestination)
+      recorderDestinationConnected = true
+    }
+
+    const canvasStream = canvasElement.captureStream(30)
+    const audioTracks = recorderDestination.stream.getAudioTracks()
+    const stream = new MediaStream([
+      ...canvasStream.getVideoTracks(),
+      ...audioTracks,
+    ])
+    const mimeType = getSupportedVideoMimeType()
+    const recorder = new MediaRecorder(stream, {
+      ...(mimeType ? { mimeType } : {}),
+      audioBitsPerSecond: 192_000,
+      videoBitsPerSecond: 5_000_000,
+    })
+
+    mediaRecorder = recorder
+    recordingStream = stream
+    recordingChunks = []
+    stopRecordingPromise = new Promise<void>((resolve, reject) => {
+      resolveStopRecording = resolve
+      rejectStopRecording = reject
+    })
+
+    recorder.addEventListener('dataavailable', (event) => {
+      if (event.data.size > 0) {
+        recordingChunks.push(event.data)
+      }
+    })
+
+    recorder.addEventListener('stop', () => {
+      const recordingType = recorder.mimeType || mimeType || 'video/webm'
+      const recording = new Blob(recordingChunks, { type: recordingType })
+
+      cleanupRecording()
+      options.onRecordingComplete?.(recording)
+      resolveStopRecording?.()
+      resolveStopRecording = null
+      rejectStopRecording = null
+      stopRecordingPromise = null
+    })
+
+    recorder.addEventListener('error', (event) => {
+      const error = event.error ?? new Error('Video recording failed.')
+      cleanupRecording()
+      rejectStopRecording?.(error)
+      resolveStopRecording = null
+      rejectStopRecording = null
+      stopRecordingPromise = null
+    })
+
+    handleRecordingAudioEnded = () => {
+      void stopVideoRecording({ pauseAudio: false })
+    }
+    audio.addEventListener('ended', handleRecordingAudioEnded, { once: true })
+
+    audio.pause()
+    audio.currentTime = 0
+    recorder.start(250)
+    await audio.play()
+  }
+
+  const stopVideoRecording = async (
+    { pauseAudio }: { pauseAudio: boolean } = { pauseAudio: true },
+  ) => {
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+      return
+    }
+
+    if (pauseAudio) {
+      audio.pause()
+    }
+
+    mediaRecorder.stop()
+    await stopRecordingPromise
+  }
+
   const getSnapshot = (): Snapshot => ({
     hasImage: Boolean(loadedImage),
     hasAudio: Boolean(audio.src),
     playing: !audio.paused && !audio.ended,
+    recording: mediaRecorder?.state === 'recording',
     currentTime: audio.currentTime,
     duration: Number.isFinite(audio.duration) ? audio.duration : 0,
   })
@@ -296,6 +441,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   }
 
   const dispose = () => {
+    void stopVideoRecording()
     audio.pause()
     audio.src = ''
 
@@ -308,6 +454,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
 
     sourceNode?.disconnect()
     analyser?.disconnect()
+    recorderDestination?.disconnect()
     sketchInstance?.remove()
     void audioContext?.close()
   }
@@ -316,10 +463,23 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     loadImage,
     loadAudio,
     togglePlayback,
+    startVideoRecording,
+    stopVideoRecording,
     getSnapshot,
     setBlockControls,
     dispose,
   }
+}
+
+const getSupportedVideoMimeType = () => {
+  if (typeof MediaRecorder === 'undefined') {
+    return ''
+  }
+
+  return (
+    VIDEO_MIME_TYPES.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ??
+    ''
+  )
 }
 
 const resizeIfNeeded = (instance: p5, host: HTMLElement) => {
@@ -541,48 +701,153 @@ const drawImageLayers = (
       destSize,
       destSize,
     )
-    drawSquareNoise(instance, destX, destY, destSize, squareNoise, seed, metrics)
+    drawSquareNoise({
+      instance,
+      image,
+      sourceAnchor,
+      sourceSize,
+      x: destX,
+      y: destY,
+      size: destSize,
+      amount: squareNoise,
+      seed,
+      metrics,
+    })
     instance.pop()
   }
 }
 
-const drawSquareNoise = (
-  instance: p5,
-  x: number,
-  y: number,
-  size: number,
-  amount: number,
-  seed: number,
-  metrics: GlitchMetrics,
-) => {
+const drawSquareNoise = ({
+  instance,
+  image,
+  sourceAnchor,
+  sourceSize,
+  x,
+  y,
+  size,
+  amount,
+  seed,
+  metrics,
+}: {
+  instance: p5
+  image: p5.Image
+  sourceAnchor: { x: number; y: number }
+  sourceSize: number
+  x: number
+  y: number
+  size: number
+  amount: number
+  seed: number
+  metrics: GlitchMetrics
+}) => {
   if (amount <= 0) {
     return
   }
 
-  const noiseCount = Math.round(mix(4, 90, amount) * (0.7 + metrics.treble))
-  const grainSize = Math.max(1, size * mix(0.012, 0.045, amount))
+  const grid = Math.round(mix(5, 18, amount))
+  const cell = size / grid
+  const signalEnergy = clamp(metrics.level * 0.9 + metrics.treble * 0.7 + metrics.bass * 0.35, 0, 1.4)
+  const cubeCount = Math.round(mix(4, 72, amount) * (0.78 + signalEnergy * 0.6))
+  const snowCount = Math.round((size * size * mix(0.003, 0.032, amount)) * (0.75 + metrics.treble * 0.75))
+  const bandCount = Math.round(mix(1, 12, amount) * (0.8 + metrics.bass * 0.9))
+  const sourceJitter = sourceSize * mix(0.05, 0.42, amount) * (0.8 + signalEnergy * 0.45)
+  const speckleUnit = Math.max(1, size / mix(48, 18, amount))
 
   instance.push()
   instance.noStroke()
-  for (let index = 0; index < noiseCount; index += 1) {
-    const grainX = x + hash01(seed + index * 5.31, 12.7) * size
-    const grainY = y + hash01(seed + index * 8.17, 44.9) * size
-    const alpha = 35 + amount * 155 * hash01(seed + index * 2.43, 72.5)
-    const warm = hash01(seed + index, 91.2) > 0.5
 
-    if (warm) {
-      instance.fill(255, 245, 210, alpha)
-    } else {
-      instance.fill(25, 35, 45, alpha)
-    }
-
-    instance.rect(
-      grainX,
-      grainY,
-      grainSize * mix(0.7, 3.2, hash01(seed + index, 101.4)),
-      grainSize,
-    )
+  if (amount > 0.06) {
+    const washAlpha = mix(7, 34, amount) * (0.65 + metrics.level * 0.9)
+    instance.fill(225, 238, 196, washAlpha)
+    instance.rect(x, y, size, size)
   }
+
+  for (let index = 0; index < cubeCount; index += 1) {
+    const col = Math.floor(hash01(seed + index * 11.1, 7.2) * grid)
+    const row = Math.floor(hash01(seed + index * 17.4, 9.8) * grid)
+    const spanX = Math.max(1, Math.round(mix(1, 4, amount * hash01(seed + index, 13.5))))
+    const spanY = Math.max(1, Math.round(mix(1, 3, amount * hash01(seed + index, 29.7))))
+    const destWidth = Math.min(size - col * cell, cell * spanX)
+    const destHeight = Math.min(size - row * cell, cell * spanY)
+    const destX = x + col * cell
+    const destY = y + row * cell
+    const localU = (destX - x + destWidth * 0.5) / size
+    const localV = (destY - y + destHeight * 0.5) / size
+    const sampleWidth = sourceSize * (destWidth / size)
+    const sampleHeight = sourceSize * (destHeight / size)
+    const sourceX = clamp(
+      sourceAnchor.x +
+        localU * sourceSize -
+        (destWidth / size) * sourceSize * 0.5 +
+        (hash01(seed + index, 41.2) - 0.5) * sourceJitter,
+      0,
+      Math.max(0, image.width - sampleWidth),
+    )
+    const sourceY = clamp(
+      sourceAnchor.y +
+        localV * sourceSize -
+        (destHeight / size) * sourceSize * 0.5 +
+        (hash01(seed + index, 58.4) - 0.5) * sourceJitter,
+      0,
+      Math.max(0, image.height - sampleHeight),
+    )
+
+    instance.copy(
+      image,
+      sourceX,
+      sourceY,
+      sampleWidth,
+      sampleHeight,
+      destX,
+      destY,
+      destWidth,
+      destHeight,
+    )
+
+    if (hash01(seed + index, 91.2) > 0.46) {
+      const alpha = mix(18, 82, amount) * hash01(seed + index, 72.5)
+      const colorPick = hash01(seed + index, 109.6)
+      if (colorPick < 0.36) {
+        instance.fill(244, 248, 214, alpha)
+      } else if (colorPick < 0.64) {
+        instance.fill(92, 196, 160, alpha * 0.72)
+      } else {
+        instance.fill(34, 55, 102, alpha * 0.68)
+      }
+      instance.rect(destX, destY, destWidth, destHeight)
+    }
+  }
+
+  for (let index = 0; index < snowCount; index += 1) {
+    const dotSize = speckleUnit * mix(0.65, 2.4, hash01(seed + index, 31.8))
+    const dotX = x + hash01(seed + index * 5.31, 12.7) * Math.max(0, size - dotSize)
+    const dotY = y + hash01(seed + index * 8.17, 44.9) * Math.max(0, size - dotSize)
+    const colorPick = hash01(seed + index, 101.4)
+    const alpha = mix(24, 118, amount) * hash01(seed + index * 2.43, 72.5)
+
+    if (colorPick < 0.34) {
+      instance.fill(246, 248, 226, alpha)
+    } else if (colorPick < 0.58) {
+      instance.fill(13, 18, 28, alpha * 0.9)
+    } else if (colorPick < 0.78) {
+      instance.fill(75, 204, 152, alpha * 0.68)
+    } else {
+      instance.fill(118, 148, 218, alpha * 0.62)
+    }
+    instance.rect(dotX, dotY, dotSize, dotSize)
+  }
+
+  for (let index = 0; index < bandCount; index += 1) {
+    const dashY = y + hash01(seed + index * 19.1, 22.2) * size
+    const dashX = x + hash01(seed + index * 13.7, 4.8) * size * 0.55
+    const dashWidth = size * mix(0.28, 1.05, hash01(seed + index, 61.3))
+    const dashHeight = Math.max(1, cell * mix(0.18, 0.72, amount))
+    const alpha = mix(28, 112, amount) * hash01(seed + index, 33.6)
+
+    instance.fill(238, 246, 218, alpha)
+    instance.rect(dashX, dashY, Math.min(x + size - dashX, dashWidth), dashHeight)
+  }
+
   instance.pop()
 }
 

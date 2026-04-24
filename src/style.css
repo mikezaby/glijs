@@ -204,7 +204,7 @@ input {
 
 .transport {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto auto 1fr;
   gap: 12px;
   align-items: center;
   min-width: 170px;
@@ -223,6 +223,12 @@ input {
 .transport__button:disabled {
   cursor: not-allowed;
   opacity: 0.42;
+}
+
+.transport__button--secondary {
+  border: 1px solid var(--line);
+  background: var(--panel-soft);
+  color: var(--text);
 }
 
 .transport__time {

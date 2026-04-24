@@ -228,6 +228,9 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
           <button data-play type="button" class="transport__button" disabled>
             Play
           </button>
+          <button data-record-video type="button" class="transport__button transport__button--secondary" disabled>
+            Record video
+          </button>
           <div class="transport__time">
             <span data-current-time>00:00</span>
             <span>/</span>
@@ -259,6 +262,9 @@ const settingsClose = document.querySelector<HTMLButtonElement>(
 const imageInput = document.querySelector<HTMLInputElement>('[data-image-input]')!
 const audioInput = document.querySelector<HTMLInputElement>('[data-audio-input]')!
 const playButton = document.querySelector<HTMLButtonElement>('[data-play]')!
+const recordButton = document.querySelector<HTMLButtonElement>(
+  '[data-record-video]',
+)!
 const status = document.querySelector<HTMLElement>('[data-status]')!
 const imageName = document.querySelector<HTMLElement>('[data-image-name]')!
 const audioName = document.querySelector<HTMLElement>('[data-audio-name]')!
@@ -280,8 +286,41 @@ for (const key of CONTROL_KEYS) {
   )
 }
 
+let statusOverride: { text: string; expiresAt: number } | null = null
+
+const setStatusOverride = (text: string, durationMs = 2500) => {
+  statusOverride = {
+    text,
+    expiresAt: Date.now() + durationMs,
+  }
+}
+
+const downloadRecording = (recording: Blob) => {
+  if (recording.size === 0) {
+    setStatusOverride('Recording produced no video data.', 3500)
+    return
+  }
+
+  const url = URL.createObjectURL(recording)
+  const link = document.createElement('a')
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const extension = recording.type.includes('mp4') ? 'mp4' : 'webm'
+
+  link.href = url
+  link.download = `glijs-recording-${stamp}.${extension}`
+  document.body.append(link)
+  link.click()
+  link.remove()
+
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url)
+  }, 30_000)
+  setStatusOverride('Video downloaded.', 3500)
+}
+
 const sketch = await createGlitchSketch({
   host: sketchHost,
+  onRecordingComplete: downloadRecording,
 })
 
 const applyBlockControls = (controls: Partial<BlockControls>) => {
@@ -377,6 +416,24 @@ playButton.addEventListener('click', async () => {
   }
 })
 
+recordButton.addEventListener('click', async () => {
+  try {
+    if (sketch.getSnapshot().recording) {
+      setStatusOverride('Preparing video download...', 5000)
+      await sketch.stopVideoRecording()
+    } else {
+      setStatusOverride('Recording video...', 5000)
+      await sketch.startVideoRecording()
+    }
+    syncUi()
+  } catch (error) {
+    setStatusOverride(
+      error instanceof Error ? error.message : 'Video recording failed.',
+      4500,
+    )
+  }
+})
+
 for (const slider of controlSliders.values()) {
   slider.addEventListener('input', () => {
     syncBlockControls()
@@ -390,9 +447,25 @@ const syncUi = () => {
 
   playButton.disabled = !snapshot.hasAudio
   playButton.textContent = snapshot.playing ? 'Pause' : 'Play'
+  recordButton.disabled = !snapshot.hasImage || !snapshot.hasAudio
+  recordButton.textContent = snapshot.recording
+    ? 'Stop & download'
+    : 'Record video'
   currentTime.textContent = formatTime(snapshot.currentTime)
   duration.textContent = formatTime(snapshot.duration)
   progress.style.width = `${Math.min(100, Math.max(0, progressRatio * 100))}%`
+
+  if (snapshot.recording) {
+    status.textContent = 'Recording video...'
+    return
+  }
+
+  if (statusOverride && Date.now() < statusOverride.expiresAt) {
+    status.textContent = statusOverride.text
+    return
+  }
+
+  statusOverride = null
 
   if (!snapshot.hasImage && !snapshot.hasAudio) {
     status.textContent = 'Load image and WAV.'
