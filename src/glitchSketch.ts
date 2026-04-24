@@ -31,6 +31,11 @@ type CoverBounds = {
   height: number
 }
 
+type AudioData = {
+  frequencies: Uint8Array<ArrayBuffer> | null
+  waveform: Uint8Array<ArrayBuffer> | null
+}
+
 const EMPTY_METRICS: GlitchMetrics = {
   level: 0,
   bass: 0,
@@ -102,6 +107,10 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
           metrics,
           audio.currentTime,
           blockControls,
+          {
+            frequencies: frequencyData,
+            waveform: waveformData,
+          },
         )
       } else {
         drawPlaceholder(instance, metrics)
@@ -327,6 +336,7 @@ const drawImageLayers = (
   metrics: GlitchMetrics,
   audioTime: number,
   blockControls: BlockControls,
+  audioData: AudioData,
 ) => {
   const bounds = getCoverBounds(image.width, image.height, instance.width * 0.84, instance.height * 0.8)
   const centerX = instance.width / 2 + Math.sin(audioTime * 1.7) * metrics.bass * 14
@@ -375,45 +385,66 @@ const drawImageLayers = (
   const spread = blockControls.spread / 100
   const density = blockControls.density / 100
   const randomness = blockControls.randomness / 100
-  const jumpPhase = Math.floor(audioTime * mix(0.35, 6, randomness))
-  const clusterCount = Math.max(1, Math.round(mix(5, 2, density)))
+  const blockX = 0
+  const blockY = 0
+  const blockWidth = instance.width
+  const blockHeight = instance.height
   const blockCount = Math.max(
     2,
-    Math.round(mix(3, 24, density) * (0.7 + metrics.chaos * 0.9)),
+    Math.round(mix(4, 48, density) * (0.85 + metrics.level * 0.65)),
   )
-  const clusterRadius =
-    Math.min(bounds.width, bounds.height) * mix(0.34, 0.08, density)
-  const jumpJitter = mix(0.18, 1.2, randomness)
+  const spreadRange = mix(0.08, 1, spread)
+  const randomPhase = Math.floor(audioTime * mix(0.8, 12, randomness))
+  const baseSize = Math.min(blockWidth, blockHeight) * mix(0.035, 0.085, density)
+  const destSize = baseSize * (0.85 + metrics.bass * 0.8)
+  const randomTravel = Math.min(blockWidth, blockHeight) * mix(0, 0.46, randomness)
 
   for (let index = 0; index < blockCount; index += 1) {
-    const clusterIndex = index % clusterCount
-    const seed = jumpPhase * 9.7 + clusterIndex * 17.3 + index * 0.41
-    const anchorU = centerWeighted(noise01(instance, seed, 1.3), spread)
-    const anchorV = centerWeighted(noise01(instance, seed, 3.7), spread)
-    const localAngle = noise01(instance, seed, 7.1) * Math.PI * 2
-    const localDistance =
-      noise01(instance, seed + audioTime * jumpJitter, 8.2) * clusterRadius
-    const localScale = mix(0.18, 1, randomness)
-    const sourceX = instance.noise(seed, 1.3) * image.width * 0.84
-    const sourceY = instance.noise(seed, 4.7) * image.height * 0.84
-    const sourceSize = image.width * (0.04 + metrics.chaos * 0.08)
-    const destSize = bounds.width * (0.05 + metrics.bass * 0.06)
-    const anchorX = x + anchorU * bounds.width
-    const anchorY = y + anchorV * bounds.height
+    const seed = index * 37.19 + randomPhase * 101.7
+    const audioPosition = getAudioBlockPosition(index, blockCount, audioData)
+    const randomAngle = hash01(seed, 13.2) * Math.PI * 2
+    const randomDistance = hash01(seed, 41.8) * randomTravel
+    const spreadU = 0.5 + (audioPosition.u - 0.5) * spreadRange
+    const spreadV = 0.5 + (audioPosition.v - 0.5) * spreadRange
+    const anchorX = blockX + spreadU * (blockWidth - destSize)
+    const anchorY = blockY + spreadV * (blockHeight - destSize)
     const destX = clamp(
-      anchorX + Math.cos(localAngle) * localDistance * localScale,
-      x,
-      x + bounds.width - destSize,
+      anchorX + Math.cos(randomAngle) * randomDistance,
+      blockX,
+      blockX + blockWidth - destSize,
     )
     const destY = clamp(
-      anchorY + Math.sin(localAngle) * localDistance * localScale,
-      y,
-      y + bounds.height - destSize,
+      anchorY + Math.sin(randomAngle) * randomDistance,
+      blockY,
+      blockY + blockHeight - destSize,
     )
+    const sourceSize = image.width * (0.04 + metrics.chaos * 0.08)
+    const sourceAnchor = getLocalSourceRect({
+      destX,
+      destY,
+      destSize,
+      sourceSize,
+      canvasWidth: blockWidth,
+      canvasHeight: blockHeight,
+      image,
+      audioPosition,
+      metrics,
+      randomness,
+    })
 
     instance.push()
     instance.tint(255, 180 + metrics.treble * 75)
-    instance.copy(image, sourceX, sourceY, sourceSize, sourceSize, destX, destY, destSize, destSize)
+    instance.copy(
+      image,
+      sourceAnchor.x,
+      sourceAnchor.y,
+      sourceSize,
+      sourceSize,
+      destX,
+      destY,
+      destSize,
+      destSize,
+    )
     instance.pop()
   }
 }
@@ -471,20 +502,94 @@ const averageRange = (
   return count === 0 ? 0 : total / count
 }
 
-const noise01 = (instance: p5, x: number, y: number) => {
-  return instance.noise(x, y)
-}
-
-const centerWeighted = (value: number, spread: number) => {
-  return clamp(0.5 + (value - 0.5) * mix(0.12, 1, spread), 0, 1)
-}
-
 const mix = (start: number, end: number, amount: number) => {
   return start + (end - start) * amount
 }
 
 const clamp = (value: number, min: number, max: number) => {
   return Math.min(max, Math.max(min, value))
+}
+
+const getAudioBlockPosition = (
+  index: number,
+  blockCount: number,
+  audioData: AudioData,
+) => {
+  const laneU = ((index + 0.5) / blockCount + hash01(index, 9.4) * 0.13) % 1
+  const laneV = hash01(index, 27.8)
+  const frequencyValue = sampleAudioData(audioData.frequencies, laneU)
+  const waveformValue = sampleAudioData(audioData.waveform, laneV)
+  const frequencyOffset = (frequencyValue - 0.5) / blockCount
+  const waveformOffset = (waveformValue - 0.5) / Math.max(3, blockCount * 0.33)
+
+  return {
+    u: wrap01(laneU + frequencyOffset),
+    v: wrap01(laneV + waveformOffset),
+    sourceU: frequencyValue,
+    sourceV: waveformValue,
+  }
+}
+
+const getLocalSourceRect = ({
+  destX,
+  destY,
+  destSize,
+  sourceSize,
+  canvasWidth,
+  canvasHeight,
+  image,
+  audioPosition,
+  metrics,
+  randomness,
+}: {
+  destX: number
+  destY: number
+  destSize: number
+  sourceSize: number
+  canvasWidth: number
+  canvasHeight: number
+  image: p5.Image
+  audioPosition: ReturnType<typeof getAudioBlockPosition>
+  metrics: GlitchMetrics
+  randomness: number
+}) => {
+  const destCenterU = (destX + destSize / 2) / canvasWidth
+  const destCenterV = (destY + destSize / 2) / canvasHeight
+  const maxLocalOffset = mix(0.015, 0.12, metrics.chaos) * mix(0.45, 1, randomness)
+  const localOffsetU = (audioPosition.sourceU - 0.5) * maxLocalOffset
+  const localOffsetV = (audioPosition.sourceV - 0.5) * maxLocalOffset
+  const sourceCenterX = (destCenterU + localOffsetU) * image.width
+  const sourceCenterY = (destCenterV + localOffsetV) * image.height
+
+  return {
+    x: clamp(sourceCenterX - sourceSize / 2, 0, image.width - sourceSize),
+    y: clamp(sourceCenterY - sourceSize / 2, 0, image.height - sourceSize),
+  }
+}
+
+const sampleAudioData = (
+  values: Uint8Array<ArrayBuffer> | null,
+  normalizedIndex: number,
+) => {
+  if (!values || values.length === 0) {
+    return normalizedIndex
+  }
+
+  const index = Math.min(values.length - 1, Math.floor(normalizedIndex * values.length))
+
+  return values[index] / 255
+}
+
+const hash01 = (x: number, salt: number) => {
+  return fract(Math.sin(x * 12.9898 + salt * 78.233) * 43758.5453)
+}
+
+const wrap01 = (value: number) => {
+  return fract(value + 1)
+}
+
+const fract = (value: number) => {
+  return value - Math.floor(value)
 }
 
 const getCoverBounds = (
