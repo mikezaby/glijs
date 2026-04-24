@@ -1,13 +1,17 @@
 import './style.css'
 import {
+  DEFAULT_FILTER_ORDER,
   createGlitchSketch,
   formatTime,
   type BlockControls,
+  type FilterGroupKey,
 } from './glitchSketch'
 import {
   loadStoredBlockControls,
+  loadStoredFilterOrder,
   loadStoredMedia,
   saveStoredBlockControls,
+  saveStoredFilterOrder,
   saveStoredMedia,
 } from './mediaStorage'
 
@@ -158,6 +162,14 @@ const CONTROL_KEYS = CONTROL_GROUPS.flatMap((group) =>
   group.controls.map((control) => control.key),
 )
 
+const FILTER_GROUP_LABELS: Record<FilterGroupKey, string> = {
+  rgbSplit: 'RGB Split',
+  tears: 'Tears',
+  squares: 'Squares',
+  scanlines: 'Scanlines',
+  streaks: 'Streaks',
+}
+
 const renderControlGroup = (group: ControlGroup) => `
   <section class="control-group">
     <h2>${group.name}</h2>
@@ -245,6 +257,11 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 
       <p class="status" data-status>Load image and WAV.</p>
 
+      <section class="control-group">
+        <h2>Filter order</h2>
+        <div class="filter-order" data-filter-order-list></div>
+      </section>
+
       <div class="control-groups">
         ${CONTROL_GROUPS.map(renderControlGroup).join('')}
       </div>
@@ -272,8 +289,12 @@ const currentTime = document.querySelector<HTMLElement>('[data-current-time]')!
 const duration = document.querySelector<HTMLElement>('[data-duration]')!
 const progress = document.querySelector<HTMLElement>('[data-progress]')!
 const sketchHost = document.querySelector<HTMLElement>('#sketch-host')!
+const filterOrderList = document.querySelector<HTMLElement>(
+  '[data-filter-order-list]',
+)!
 const controlSliders = new Map<ControlKey, HTMLInputElement>()
 const controlValues = new Map<ControlKey, HTMLElement>()
+let filterOrder: FilterGroupKey[] = [...DEFAULT_FILTER_ORDER]
 
 for (const key of CONTROL_KEYS) {
   controlSliders.set(
@@ -322,6 +343,50 @@ const sketch = await createGlitchSketch({
   host: sketchHost,
   onRecordingComplete: downloadRecording,
 })
+
+const renderFilterOrder = () => {
+  filterOrderList.innerHTML = filterOrder
+    .map(
+      (key, index) => `
+        <div class="filter-order__item" data-filter-order-item="${key}">
+          <span>${index + 1}. ${FILTER_GROUP_LABELS[key]}</span>
+          <div class="filter-order__actions">
+            <button
+              type="button"
+              data-filter-move="${key}"
+              data-filter-direction="up"
+              ${index === 0 ? 'disabled' : ''}
+              aria-label="Move ${FILTER_GROUP_LABELS[key]} earlier"
+            >
+              Up
+            </button>
+            <button
+              type="button"
+              data-filter-move="${key}"
+              data-filter-direction="down"
+              ${index === filterOrder.length - 1 ? 'disabled' : ''}
+              aria-label="Move ${FILTER_GROUP_LABELS[key]} later"
+            >
+              Down
+            </button>
+          </div>
+        </div>
+      `,
+    )
+    .join('')
+}
+
+const applyFilterOrder = (nextOrder: FilterGroupKey[]) => {
+  const ordered = nextOrder.filter((key, index) => {
+    return DEFAULT_FILTER_ORDER.includes(key) && nextOrder.indexOf(key) === index
+  })
+  const missing = DEFAULT_FILTER_ORDER.filter((key) => !ordered.includes(key))
+
+  filterOrder = [...ordered, ...missing]
+  sketch.setFilterOrder(filterOrder)
+  saveStoredFilterOrder(filterOrder)
+  renderFilterOrder()
+}
 
 const applyBlockControls = (controls: Partial<BlockControls>) => {
   for (const key of CONTROL_KEYS) {
@@ -434,6 +499,33 @@ recordButton.addEventListener('click', async () => {
   }
 })
 
+filterOrderList.addEventListener('click', (event) => {
+  const target = event.target
+
+  if (!(target instanceof HTMLButtonElement)) {
+    return
+  }
+
+  const key = target.dataset.filterMove as FilterGroupKey | undefined
+  const direction = target.dataset.filterDirection
+
+  if (!key || !DEFAULT_FILTER_ORDER.includes(key)) {
+    return
+  }
+
+  const currentIndex = filterOrder.indexOf(key)
+  const nextIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+
+  if (currentIndex < 0 || nextIndex < 0 || nextIndex >= filterOrder.length) {
+    return
+  }
+
+  const nextOrder = [...filterOrder]
+  nextOrder[currentIndex] = filterOrder[nextIndex]
+  nextOrder[nextIndex] = key
+  applyFilterOrder(nextOrder)
+})
+
 for (const slider of controlSliders.values()) {
   slider.addEventListener('input', () => {
     syncBlockControls()
@@ -517,6 +609,7 @@ const restoreStoredMedia = async () => {
 }
 
 applyBlockControls(loadStoredBlockControls() ?? DEFAULT_BLOCK_CONTROLS)
+applyFilterOrder(loadStoredFilterOrder() ?? DEFAULT_FILTER_ORDER)
 syncBlockControls()
 syncUi()
 void restoreStoredMedia()

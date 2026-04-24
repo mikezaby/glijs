@@ -281,6 +281,48 @@ input {
   accent-color: var(--accent);
 }
 
+.filter-order {
+  display: grid;
+  gap: 8px;
+}
+
+.filter-order__item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.filter-order__item span {
+  min-width: 0;
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.filter-order__actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.filter-order__actions button {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 6px 8px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.filter-order__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
 @media (max-width: 860px) {
   .settings {
     top: auto;

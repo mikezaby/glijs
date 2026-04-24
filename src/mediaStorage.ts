@@ -1,4 +1,4 @@
-import type { BlockControls } from './glitchSketch'
+import { DEFAULT_FILTER_ORDER, type BlockControls, type FilterGroupKey } from './glitchSketch'
 
 type StoredMediaKind = 'image' | 'audio'
 
@@ -19,6 +19,7 @@ const STORE_NAME = 'files'
 const DB_VERSION = 1
 const MANIFEST_KEY = 'glijs:selected-media'
 const BLOCK_CONTROLS_KEY = 'glijs:block-controls'
+const FILTER_ORDER_KEY = 'glijs:filter-order'
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -90,6 +91,25 @@ export function loadStoredBlockControls(): Partial<BlockControls> | null {
     }
   } catch {
     localStorage.removeItem(BLOCK_CONTROLS_KEY)
+    return null
+  }
+}
+
+export function saveStoredFilterOrder(order: FilterGroupKey[]) {
+  localStorage.setItem(FILTER_ORDER_KEY, JSON.stringify(normalizeFilterOrder(order)))
+}
+
+export function loadStoredFilterOrder(): FilterGroupKey[] | null {
+  const rawOrder = localStorage.getItem(FILTER_ORDER_KEY)
+
+  if (!rawOrder) {
+    return null
+  }
+
+  try {
+    return normalizeFilterOrder(JSON.parse(rawOrder))
+  } catch {
+    localStorage.removeItem(FILTER_ORDER_KEY)
     return null
   }
 }
@@ -169,4 +189,21 @@ const normalizeControlValue = (value: unknown) => {
   return typeof value === 'number' && Number.isFinite(value)
     ? Math.min(100, Math.max(0, value))
     : undefined
+}
+
+const normalizeFilterOrder = (value: unknown) => {
+  if (!Array.isArray(value)) {
+    return [...DEFAULT_FILTER_ORDER]
+  }
+
+  const ordered = value.filter((key, index): key is FilterGroupKey => {
+    return (
+      typeof key === 'string' &&
+      DEFAULT_FILTER_ORDER.includes(key as FilterGroupKey) &&
+      value.indexOf(key) === index
+    )
+  })
+  const missing = DEFAULT_FILTER_ORDER.filter((key) => !ordered.includes(key))
+
+  return [...ordered, ...missing]
 }

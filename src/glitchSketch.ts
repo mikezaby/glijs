@@ -26,6 +26,13 @@ export type BlockControls = {
   backdropIntensity: number
 }
 
+export type FilterGroupKey =
+  | 'rgbSplit'
+  | 'tears'
+  | 'squares'
+  | 'scanlines'
+  | 'streaks'
+
 type Snapshot = {
   hasImage: boolean
   hasAudio: boolean
@@ -63,6 +70,14 @@ const VIDEO_MIME_TYPES = [
   'video/webm;codecs=vp8,opus',
   'video/webm;codecs=h264,opus',
   'video/webm',
+]
+
+export const DEFAULT_FILTER_ORDER: FilterGroupKey[] = [
+  'rgbSplit',
+  'tears',
+  'squares',
+  'scanlines',
+  'streaks',
 ]
 
 const DEFAULT_BLOCK_CONTROLS: BlockControls = {
@@ -114,6 +129,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   let metrics: GlitchMetrics = { ...EMPTY_METRICS }
   let sketchInstance: p5 | null = null
   let blockControls: BlockControls = { ...DEFAULT_BLOCK_CONTROLS }
+  let filterOrder: FilterGroupKey[] = [...DEFAULT_FILTER_ORDER]
   let recorderDestination: MediaStreamAudioDestinationNode | null = null
   let recorderDestinationConnected = false
   let mediaRecorder: MediaRecorder | null = null
@@ -153,6 +169,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
           metrics,
           audio.currentTime,
           blockControls,
+          filterOrder,
           {
             frequencies: frequencyData,
             waveform: waveformData,
@@ -162,7 +179,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
         drawPlaceholder(instance, metrics)
       }
 
-      drawOverlay(instance, metrics, blockControls)
+      drawFinalShade(instance)
       options.onMetrics?.(metrics)
     }
   }
@@ -440,6 +457,10 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     }
   }
 
+  const setFilterOrder = (nextOrder: FilterGroupKey[]) => {
+    filterOrder = normalizeFilterOrder(nextOrder)
+  }
+
   const dispose = () => {
     void stopVideoRecording()
     audio.pause()
@@ -467,8 +488,18 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     stopVideoRecording,
     getSnapshot,
     setBlockControls,
+    setFilterOrder,
     dispose,
   }
+}
+
+const normalizeFilterOrder = (order: FilterGroupKey[]) => {
+  const ordered = order.filter((key, index) => {
+    return DEFAULT_FILTER_ORDER.includes(key) && order.indexOf(key) === index
+  })
+  const missing = DEFAULT_FILTER_ORDER.filter((key) => !ordered.includes(key))
+
+  return [...ordered, ...missing]
 }
 
 const getSupportedVideoMimeType = () => {
@@ -553,22 +584,14 @@ const drawImageLayers = (
   metrics: GlitchMetrics,
   audioTime: number,
   blockControls: BlockControls,
+  filterOrder: FilterGroupKey[],
   audioData: AudioData,
 ) => {
   const bounds = getCoverBounds(image.width, image.height, instance.width * 0.84, instance.height * 0.8)
-  const rgbAmount = blockControls.rgbAmount / 100
-  const rgbOpacity = blockControls.rgbOpacity / 100
-  const rgbState = getRgbSplitState(audioData, metrics, audioTime)
   const centerX = instance.width / 2 + Math.sin(audioTime * 1.7) * metrics.bass * 14
   const centerY = instance.height / 2 + Math.cos(audioTime * 2.2) * metrics.level * 10
   const x = centerX - bounds.width / 2
   const y = centerY - bounds.height / 2
-  const channelOffset =
-    (4 + metrics.treble * 38 + metrics.level * 22 + metrics.bass * 12) *
-    rgbAmount *
-    rgbState.pulse
-  const splitX = Math.cos(rgbState.angle) * channelOffset
-  const splitY = Math.sin(rgbState.angle) * channelOffset
 
   instance.push()
   instance.blendMode(instance.BLEND)
@@ -576,61 +599,123 @@ const drawImageLayers = (
   instance.image(image, x, y, bounds.width, bounds.height)
   instance.pop()
 
-  if (rgbAmount > 0 && rgbOpacity > 0) {
-    instance.push()
-    instance.blendMode(instance.ADD)
-    instance.tint(255, 56, 42, (62 + metrics.chaos * 120) * rgbOpacity * rgbState.opacity)
-    instance.image(image, x - splitX, y - splitY, bounds.width, bounds.height)
-    instance.tint(58, 255, 128, (34 + metrics.level * 90) * rgbOpacity * rgbState.opacity)
-    instance.image(
-      image,
-      x + splitY * 0.75,
-      y - splitX * 0.75,
-      bounds.width,
-      bounds.height,
-    )
-    instance.tint(62, 196, 255, (64 + metrics.treble * 145) * rgbOpacity * rgbState.opacity)
-    instance.image(
-      image,
-      x + splitX * 1.1,
-      y + splitY * 1.1 + metrics.level * 10,
-      bounds.width,
-      bounds.height,
-    )
-    instance.pop()
+  for (const group of filterOrder) {
+    const source = instance.get()
+
+    switch (group) {
+      case 'rgbSplit':
+        drawRgbSplit(instance, source, metrics, audioTime, blockControls, audioData)
+        break
+      case 'tears':
+        drawTears(instance, source, metrics, audioTime, blockControls)
+        break
+      case 'squares':
+        drawSquares(instance, source, metrics, audioTime, blockControls, audioData)
+        break
+      case 'scanlines':
+        drawScanlines(instance, metrics, blockControls)
+        break
+      case 'streaks':
+        drawStreaks(instance, metrics, blockControls)
+        break
+    }
+  }
+}
+
+const drawRgbSplit = (
+  target: p5,
+  source: p5.Image,
+  metrics: GlitchMetrics,
+  audioTime: number,
+  blockControls: BlockControls,
+  audioData: AudioData,
+) => {
+  const rgbAmount = blockControls.rgbAmount / 100
+  const rgbOpacity = blockControls.rgbOpacity / 100
+
+  if (rgbAmount <= 0 || rgbOpacity <= 0) {
+    return
   }
 
+  const rgbState = getRgbSplitState(audioData, metrics, audioTime)
+  const channelOffset =
+    (4 + metrics.treble * 38 + metrics.level * 22 + metrics.bass * 12) *
+    rgbAmount *
+    rgbState.pulse
+  const splitX = Math.cos(rgbState.angle) * channelOffset
+  const splitY = Math.sin(rgbState.angle) * channelOffset
+
+  target.push()
+  target.blendMode(target.ADD)
+  target.tint(255, 56, 42, (62 + metrics.chaos * 120) * rgbOpacity * rgbState.opacity)
+  target.image(source, -splitX, -splitY, target.width, target.height)
+  target.tint(58, 255, 128, (34 + metrics.level * 90) * rgbOpacity * rgbState.opacity)
+  target.image(
+    source,
+    splitY * 0.75,
+    -splitX * 0.75,
+    target.width,
+    target.height,
+  )
+  target.tint(62, 196, 255, (64 + metrics.treble * 145) * rgbOpacity * rgbState.opacity)
+  target.image(
+    source,
+    splitX * 1.1,
+    splitY * 1.1 + metrics.level * 10,
+    target.width,
+    target.height,
+  )
+  target.pop()
+}
+
+const drawTears = (
+  target: p5,
+  source: p5.Image,
+  metrics: GlitchMetrics,
+  audioTime: number,
+  blockControls: BlockControls,
+) => {
   const tearCountControl = blockControls.tearCount / 100
   const tearHeightControl = blockControls.tearHeight / 100
   const tearShiftControl = blockControls.tearShift / 100
   const tearCount = Math.round((2 + metrics.bass * 12) * tearCountControl)
+
   for (let index = 0; index < tearCount; index += 1) {
     const seed = audioTime * 0.8 + index * 0.2
-    const normalizedY = instance.noise(seed, metrics.chaos * 5)
-    const sliceSourceY = normalizedY * image.height * 0.92
+    const normalizedY = target.noise(seed, metrics.chaos * 5)
+    const sliceSourceY = normalizedY * source.height * 0.92
     const sliceHeight = Math.max(
       1,
-      image.height * mix(0.01, 0.12, tearHeightControl) * (0.65 + metrics.level),
+      source.height * mix(0.01, 0.12, tearHeightControl) * (0.65 + metrics.level),
     )
-    const sliceDestY = y + normalizedY * bounds.height
+    const sliceDestY = normalizedY * target.height
     const shift =
-      (instance.noise(seed * 2.8, 2.4) - 0.5) *
+      (target.noise(seed * 2.8, 2.4) - 0.5) *
       (40 + metrics.bass * 180) *
       tearShiftControl
 
-    instance.copy(
-      image,
+    target.copy(
+      source,
       0,
       sliceSourceY,
-      image.width,
+      source.width,
       sliceHeight,
-      x + shift,
+      shift,
       sliceDestY,
-      bounds.width,
-      (sliceHeight / image.height) * bounds.height,
+      target.width,
+      sliceHeight,
     )
   }
+}
 
+const drawSquares = (
+  target: p5,
+  source: p5.Image,
+  metrics: GlitchMetrics,
+  audioTime: number,
+  blockControls: BlockControls,
+  audioData: AudioData,
+) => {
   const spread = blockControls.spread / 100
   const density = blockControls.density / 100
   const size = blockControls.size / 100
@@ -643,8 +728,8 @@ const drawImageLayers = (
 
   const blockX = 0
   const blockY = 0
-  const blockWidth = instance.width
-  const blockHeight = instance.height
+  const blockWidth = target.width
+  const blockHeight = target.height
   const destSize = Math.min(blockWidth, blockHeight) * mix(0.04, 0.18, size)
   const targetCoverage = blockWidth * blockHeight * density
   const blockCount = Math.max(
@@ -674,7 +759,7 @@ const drawImageLayers = (
       blockY,
       blockY + blockHeight - destSize,
     )
-    const sourceSize = Math.min(image.width, image.height) * mix(0.9, 1.2, metrics.chaos) * (destSize / Math.min(blockWidth, blockHeight))
+    const sourceSize = Math.min(source.width, source.height) * mix(0.9, 1.2, metrics.chaos) * (destSize / Math.min(blockWidth, blockHeight))
     const sourceAnchor = getLocalSourceRect({
       destX,
       destY,
@@ -682,16 +767,16 @@ const drawImageLayers = (
       sourceSize,
       canvasWidth: blockWidth,
       canvasHeight: blockHeight,
-      image,
+      source,
       audioPosition,
       metrics,
       randomness,
     })
 
-    instance.push()
-    instance.tint(255, 180 + metrics.treble * 75)
-    instance.copy(
-      image,
+    target.push()
+    target.tint(255, 180 + metrics.treble * 75)
+    target.copy(
+      source,
       sourceAnchor.x,
       sourceAnchor.y,
       sourceSize,
@@ -702,8 +787,8 @@ const drawImageLayers = (
       destSize,
     )
     drawSquareNoise({
-      instance,
-      image,
+      target,
+      source,
       sourceAnchor,
       sourceSize,
       x: destX,
@@ -713,13 +798,13 @@ const drawImageLayers = (
       seed,
       metrics,
     })
-    instance.pop()
+    target.pop()
   }
 }
 
 const drawSquareNoise = ({
-  instance,
-  image,
+  target,
+  source,
   sourceAnchor,
   sourceSize,
   x,
@@ -729,8 +814,8 @@ const drawSquareNoise = ({
   seed,
   metrics,
 }: {
-  instance: p5
-  image: p5.Image
+  target: p5
+  source: p5.Image
   sourceAnchor: { x: number; y: number }
   sourceSize: number
   x: number
@@ -753,13 +838,13 @@ const drawSquareNoise = ({
   const sourceJitter = sourceSize * mix(0.05, 0.42, amount) * (0.8 + signalEnergy * 0.45)
   const speckleUnit = Math.max(1, size / mix(48, 18, amount))
 
-  instance.push()
-  instance.noStroke()
+  target.push()
+  target.noStroke()
 
   if (amount > 0.06) {
     const washAlpha = mix(7, 34, amount) * (0.65 + metrics.level * 0.9)
-    instance.fill(225, 238, 196, washAlpha)
-    instance.rect(x, y, size, size)
+    target.fill(225, 238, 196, washAlpha)
+    target.rect(x, y, size, size)
   }
 
   for (let index = 0; index < cubeCount; index += 1) {
@@ -781,7 +866,7 @@ const drawSquareNoise = ({
         (destWidth / size) * sourceSize * 0.5 +
         (hash01(seed + index, 41.2) - 0.5) * sourceJitter,
       0,
-      Math.max(0, image.width - sampleWidth),
+      Math.max(0, source.width - sampleWidth),
     )
     const sourceY = clamp(
       sourceAnchor.y +
@@ -789,11 +874,11 @@ const drawSquareNoise = ({
         (destHeight / size) * sourceSize * 0.5 +
         (hash01(seed + index, 58.4) - 0.5) * sourceJitter,
       0,
-      Math.max(0, image.height - sampleHeight),
+      Math.max(0, source.height - sampleHeight),
     )
 
-    instance.copy(
-      image,
+    target.copy(
+      source,
       sourceX,
       sourceY,
       sampleWidth,
@@ -808,13 +893,13 @@ const drawSquareNoise = ({
       const alpha = mix(18, 82, amount) * hash01(seed + index, 72.5)
       const colorPick = hash01(seed + index, 109.6)
       if (colorPick < 0.36) {
-        instance.fill(244, 248, 214, alpha)
+        target.fill(244, 248, 214, alpha)
       } else if (colorPick < 0.64) {
-        instance.fill(92, 196, 160, alpha * 0.72)
+        target.fill(92, 196, 160, alpha * 0.72)
       } else {
-        instance.fill(34, 55, 102, alpha * 0.68)
+        target.fill(34, 55, 102, alpha * 0.68)
       }
-      instance.rect(destX, destY, destWidth, destHeight)
+      target.rect(destX, destY, destWidth, destHeight)
     }
   }
 
@@ -826,15 +911,15 @@ const drawSquareNoise = ({
     const alpha = mix(24, 118, amount) * hash01(seed + index * 2.43, 72.5)
 
     if (colorPick < 0.34) {
-      instance.fill(246, 248, 226, alpha)
+      target.fill(246, 248, 226, alpha)
     } else if (colorPick < 0.58) {
-      instance.fill(13, 18, 28, alpha * 0.9)
+      target.fill(13, 18, 28, alpha * 0.9)
     } else if (colorPick < 0.78) {
-      instance.fill(75, 204, 152, alpha * 0.68)
+      target.fill(75, 204, 152, alpha * 0.68)
     } else {
-      instance.fill(118, 148, 218, alpha * 0.62)
+      target.fill(118, 148, 218, alpha * 0.62)
     }
-    instance.rect(dotX, dotY, dotSize, dotSize)
+    target.rect(dotX, dotY, dotSize, dotSize)
   }
 
   for (let index = 0; index < bandCount; index += 1) {
@@ -844,11 +929,11 @@ const drawSquareNoise = ({
     const dashHeight = Math.max(1, cell * mix(0.18, 0.72, amount))
     const alpha = mix(28, 112, amount) * hash01(seed + index, 33.6)
 
-    instance.fill(238, 246, 218, alpha)
-    instance.rect(dashX, dashY, Math.min(x + size - dashX, dashWidth), dashHeight)
+    target.fill(238, 246, 218, alpha)
+    target.rect(dashX, dashY, Math.min(x + size - dashX, dashWidth), dashHeight)
   }
 
-  instance.pop()
+  target.pop()
 }
 
 const getRgbSplitState = (
@@ -878,37 +963,56 @@ const getRgbSplitState = (
   }
 }
 
-const drawOverlay = (
-  instance: p5,
+const drawScanlines = (
+  target: p5,
   metrics: GlitchMetrics,
   blockControls: BlockControls,
 ) => {
   const scanlineDensity = blockControls.scanlineDensity / 100
   const scanlineOpacity = blockControls.scanlineOpacity / 100
+
+  if (scanlineDensity <= 0 || scanlineOpacity <= 0) {
+    return
+  }
+
+  const scanlineGap = Math.round(mix(18, 3, scanlineDensity))
+  target.push()
+  for (let y = 0; y < target.height; y += scanlineGap) {
+    const alpha = (15 + metrics.treble * 26 + (y % 12 === 0 ? 12 : 0)) * scanlineOpacity
+    target.fill(255, 255, 255, alpha)
+    target.rect(0, y, target.width, 1)
+  }
+  target.pop()
+}
+
+const drawStreaks = (
+  target: p5,
+  metrics: GlitchMetrics,
+  blockControls: BlockControls,
+) => {
   const streakCountControl = blockControls.streakCount / 100
   const streakLength = blockControls.streakLength / 100
   const streakOpacity = blockControls.streakOpacity / 100
-  const scanlineGap = Math.round(mix(18, 3, scanlineDensity))
 
-  instance.push()
-  if (scanlineDensity > 0 && scanlineOpacity > 0) {
-    for (let y = 0; y < instance.height; y += scanlineGap) {
-      const alpha = (15 + metrics.treble * 26 + (y % 12 === 0 ? 12 : 0)) * scanlineOpacity
-      instance.fill(255, 255, 255, alpha)
-      instance.rect(0, y, instance.width, 1)
-    }
+  if (streakCountControl <= 0 || streakOpacity <= 0) {
+    return
   }
 
   const streaks = Math.round((4 + metrics.chaos * 24) * streakCountControl)
+  target.push()
   for (let index = 0; index < streaks; index += 1) {
-    const noiseValue = instance.noise(index * 0.8, instance.frameCount * 0.02)
-    const streakY = noiseValue * instance.height
-    const streakWidth = instance.width * mix(0.06, 0.85, streakLength) * (0.55 + metrics.level)
-    const streakX = (instance.noise(index * 1.4, instance.frameCount * 0.02 + 9) - 0.2) * instance.width
-    instance.fill(255, 134, 92, (12 + metrics.bass * 45) * streakOpacity)
-    instance.rect(streakX, streakY, streakWidth, 2 + metrics.level * 3)
+    const noiseValue = target.noise(index * 0.8, target.frameCount * 0.02)
+    const streakY = noiseValue * target.height
+    const streakWidth = target.width * mix(0.06, 0.85, streakLength) * (0.55 + metrics.level)
+    const streakX = (target.noise(index * 1.4, target.frameCount * 0.02 + 9) - 0.2) * target.width
+    target.fill(255, 134, 92, (12 + metrics.bass * 45) * streakOpacity)
+    target.rect(streakX, streakY, streakWidth, 2 + metrics.level * 3)
   }
+  target.pop()
+}
 
+const drawFinalShade = (instance: p5) => {
+  instance.push()
   instance.fill(8, 10, 18, 42)
   instance.rect(0, 0, instance.width, instance.height)
   instance.pop()
@@ -987,7 +1091,7 @@ const getLocalSourceRect = ({
   sourceSize,
   canvasWidth,
   canvasHeight,
-  image,
+  source,
   audioPosition,
   metrics,
   randomness,
@@ -998,7 +1102,7 @@ const getLocalSourceRect = ({
   sourceSize: number
   canvasWidth: number
   canvasHeight: number
-  image: p5.Image
+  source: p5.Image
   audioPosition: ReturnType<typeof getAudioBlockPosition>
   metrics: GlitchMetrics
   randomness: number
@@ -1008,12 +1112,12 @@ const getLocalSourceRect = ({
   const maxLocalOffset = mix(0.015, 0.12, metrics.chaos) * mix(0.45, 1, randomness)
   const localOffsetU = (audioPosition.sourceU - 0.5) * maxLocalOffset
   const localOffsetV = (audioPosition.sourceV - 0.5) * maxLocalOffset
-  const sourceCenterX = (destCenterU + localOffsetU) * image.width
-  const sourceCenterY = (destCenterV + localOffsetV) * image.height
+  const sourceCenterX = (destCenterU + localOffsetU) * source.width
+  const sourceCenterY = (destCenterV + localOffsetV) * source.height
 
   return {
-    x: clamp(sourceCenterX - sourceSize / 2, 0, image.width - sourceSize),
-    y: clamp(sourceCenterY - sourceSize / 2, 0, image.height - sourceSize),
+    x: clamp(sourceCenterX - sourceSize / 2, 0, source.width - sourceSize),
+    y: clamp(sourceCenterY - sourceSize / 2, 0, source.height - sourceSize),
   }
 }
 
