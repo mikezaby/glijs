@@ -18,6 +18,10 @@ export type BlockControls = {
   tearShift: number
   rgbAmount: number
   rgbOpacity: number
+  rgbBalance: number
+  rgbDrift: number
+  rgbSaturation: number
+  rgbAudioTint: number
   scanlineDensity: number
   scanlineOpacity: number
   streakCount: number
@@ -91,6 +95,10 @@ const DEFAULT_BLOCK_CONTROLS: BlockControls = {
   tearShift: 65,
   rgbAmount: 60,
   rgbOpacity: 65,
+  rgbBalance: 50,
+  rgbDrift: 35,
+  rgbSaturation: 58,
+  rgbAudioTint: 62,
   scanlineDensity: 55,
   scanlineOpacity: 45,
   streakCount: 45,
@@ -448,6 +456,10 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       tearShift: clamp(nextControls.tearShift, 0, 100),
       rgbAmount: clamp(nextControls.rgbAmount, 0, 100),
       rgbOpacity: clamp(nextControls.rgbOpacity, 0, 100),
+      rgbBalance: clamp(nextControls.rgbBalance, 0, 100),
+      rgbDrift: clamp(nextControls.rgbDrift, 0, 100),
+      rgbSaturation: clamp(nextControls.rgbSaturation, 0, 100),
+      rgbAudioTint: clamp(nextControls.rgbAudioTint, 0, 100),
       scanlineDensity: clamp(nextControls.scanlineDensity, 0, 100),
       scanlineOpacity: clamp(nextControls.scanlineOpacity, 0, 100),
       streakCount: clamp(nextControls.streakCount, 0, 100),
@@ -632,12 +644,43 @@ const drawRgbSplit = (
 ) => {
   const rgbAmount = blockControls.rgbAmount / 100
   const rgbOpacity = blockControls.rgbOpacity / 100
+  const rgbBalance = blockControls.rgbBalance / 100
+  const rgbDrift = blockControls.rgbDrift / 100
+  const rgbSaturation = blockControls.rgbSaturation / 100
+  const rgbAudioTint = blockControls.rgbAudioTint / 100
 
   if (rgbAmount <= 0 || rgbOpacity <= 0) {
     return
   }
 
   const rgbState = getRgbSplitState(audioData, metrics, audioTime)
+  const balance = (rgbBalance - 0.5) * 2
+  const drift =
+    Math.sin(audioTime * (0.65 + rgbState.high * 2.6) + rgbState.angle * 1.7) *
+    rgbDrift
+  const bassCyanPush = rgbState.low * rgbAudioTint
+  const highRedPush = rgbState.high * rgbAudioTint
+  const midSpectralPush = rgbState.mid * rgbAudioTint
+  const spectralContrast = (rgbState.high - rgbState.low) * rgbAudioTint
+  const redPower = clamp(0.72 + balance * 0.62 + highRedPush * 1.35 - bassCyanPush * 0.38 + drift * 0.32, 0.16, 2.45)
+  const cyanPower = clamp(0.72 - balance * 0.62 + bassCyanPush * 1.45 - highRedPush * 0.28 - drift * 0.24, 0.16, 2.45)
+  const violetPower = clamp(0.58 + midSpectralPush * 0.9 + Math.abs(spectralContrast) * 0.55 + drift * 0.22, 0.12, 2.1)
+  const saturation = mix(0.42, 1.65, rgbSaturation)
+  const redTint = {
+    r: clampColor(156 + 88 * redPower * saturation + 42 * highRedPush),
+    g: clampColor(18 + 28 * (1 - balance) + 32 * midSpectralPush),
+    b: clampColor(34 + 64 * violetPower * (1 - rgbSaturation * 0.35)),
+  }
+  const cyanTint = {
+    r: clampColor(18 + 38 * redPower * (1 - rgbSaturation * 0.38) + 28 * midSpectralPush),
+    g: clampColor(128 + 92 * cyanPower * saturation + 42 * bassCyanPush),
+    b: clampColor(152 + 94 * cyanPower * saturation + 36 * bassCyanPush),
+  }
+  const blueTint = {
+    r: clampColor(44 + 84 * violetPower + 46 * highRedPush),
+    g: clampColor(62 + 78 * cyanPower * saturation + 42 * midSpectralPush),
+    b: clampColor(142 + 88 * saturation + 62 * bassCyanPush + 32 * violetPower),
+  }
   const channelOffset =
     (4 + metrics.treble * 38 + metrics.level * 22 + metrics.bass * 12) *
     rgbAmount *
@@ -647,9 +690,9 @@ const drawRgbSplit = (
 
   target.push()
   target.blendMode(target.ADD)
-  target.tint(255, 56, 42, (62 + metrics.chaos * 120) * rgbOpacity * rgbState.opacity)
+  target.tint(redTint.r, redTint.g, redTint.b, (62 + metrics.chaos * 120) * rgbOpacity * rgbState.opacity * redPower)
   target.image(source, -splitX, -splitY, target.width, target.height)
-  target.tint(58, 255, 128, (34 + metrics.level * 90) * rgbOpacity * rgbState.opacity)
+  target.tint(cyanTint.r, cyanTint.g, cyanTint.b, (34 + metrics.level * 90) * rgbOpacity * rgbState.opacity * cyanPower)
   target.image(
     source,
     splitY * 0.75,
@@ -657,7 +700,7 @@ const drawRgbSplit = (
     target.width,
     target.height,
   )
-  target.tint(62, 196, 255, (64 + metrics.treble * 145) * rgbOpacity * rgbState.opacity)
+  target.tint(blueTint.r, blueTint.g, blueTint.b, (64 + metrics.treble * 145) * rgbOpacity * rgbState.opacity * violetPower)
   target.image(
     source,
     splitX * 1.1,
@@ -958,6 +1001,9 @@ const getRgbSplitState = (
 
   return {
     angle,
+    low,
+    mid,
+    high,
     pulse: clamp(0.35 + audioFlux * 1.85, 0.2, 2.8),
     opacity: clamp(0.55 + audioFlux * 1.15, 0.35, 1.85),
   }
@@ -1052,6 +1098,10 @@ const mix = (start: number, end: number, amount: number) => {
 
 const clamp = (value: number, min: number, max: number) => {
   return Math.min(max, Math.max(min, value))
+}
+
+const clampColor = (value: number) => {
+  return clamp(value, 0, 255)
 }
 
 const getAudioBlockPosition = (
