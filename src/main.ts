@@ -9,6 +9,11 @@ import {
   type FilterGroupKey,
 } from './glitchSketch'
 import {
+  DEFAULT_DEMO_AUDIO,
+  DEFAULT_DEMO_VISUAL,
+  loadDemoMediaFile,
+} from './demoMedia'
+import {
   canRecordVideo,
   canRenderVideo,
   getRenderButtonLabel,
@@ -933,26 +938,28 @@ const animateUi = () => {
 }
 
 const restoreStoredMedia = async () => {
-  status.textContent = 'Restoring saved media...'
+  status.textContent = 'Loading demo media...'
 
   try {
     const [storedImage, storedAudio] = await Promise.all([
       loadStoredMedia('image'),
       loadStoredMedia('audio'),
     ])
+    const [visualFile, audioFile] = await Promise.all([
+      storedImage ?? loadDemoMediaFile(DEFAULT_DEMO_VISUAL),
+      storedAudio ?? loadDemoMediaFile(DEFAULT_DEMO_AUDIO),
+    ])
 
-    if (storedImage) {
-      await sketch.loadVisualMedia(storedImage)
-      imageName.textContent = storedImage.name
-    }
+    await sketch.loadVisualMedia(visualFile)
+    imageName.textContent = storedImage
+      ? visualFile.name
+      : `Demo: ${visualFile.name}`
 
-    if (storedAudio) {
-      await sketch.loadAudio(storedAudio)
-      audioName.textContent = storedAudio.name
-    }
+    await sketch.loadAudio(audioFile)
+    audioName.textContent = storedAudio ? audioFile.name : `Demo: ${audioFile.name}`
   } catch (error) {
     status.textContent =
-      error instanceof Error ? error.message : 'Saved media could not be restored.'
+      error instanceof Error ? error.message : 'Default media could not be loaded.'
   }
 
   syncUi()

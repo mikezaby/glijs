@@ -207,7 +207,7 @@ const normalizeInteger = (
 
 const normalizeMergeDelay = (value: unknown) => {
   return typeof value === 'number' && Number.isFinite(value)
-    ? clamp(value, 0, 10)
+    ? clamp(value, 2, 10)
     : DEFAULT_VIDEO_RHYTHM_CONTROLS.mergeDelay
 }
 
