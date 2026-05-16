@@ -191,8 +191,24 @@ input {
   background: rgba(17, 17, 17, 0.48);
 }
 
+.control-group.is-solo {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+}
+
+.control-group.is-disabled:not(.is-solo),
+.control-group.is-muted-by-solo {
+  opacity: 0.56;
+}
+
+.control-group__head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .control-group h2 {
   display: flex;
+  flex: 1;
   gap: 9px;
   align-items: center;
   margin: 0;
@@ -216,6 +232,33 @@ input {
   height: 1px;
   background: var(--line);
   content: '';
+}
+
+.filter-toggles {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.toggle-field {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.toggle-field input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.toggle-field--solo {
+  color: var(--accent);
 }
 
 .media-row {

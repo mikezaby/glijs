@@ -1,4 +1,19 @@
 import type p5 from 'p5'
+import {
+  DEFAULT_FILTER_GROUP_STATE,
+  DEFAULT_FILTER_ORDER,
+  normalizeFilterOrder,
+  resolveActiveFilterOrder,
+  type FilterGroupKey,
+  type FilterGroupState,
+} from './filterState'
+
+export {
+  DEFAULT_FILTER_GROUP_STATE,
+  DEFAULT_FILTER_ORDER,
+  type FilterGroupKey,
+  type FilterGroupState,
+} from './filterState'
 
 export type GlitchMetrics = {
   level: number
@@ -29,13 +44,6 @@ export type BlockControls = {
   streakOpacity: number
   backdropIntensity: number
 }
-
-export type FilterGroupKey =
-  | 'rgbSplit'
-  | 'tears'
-  | 'squares'
-  | 'scanlines'
-  | 'streaks'
 
 type Snapshot = {
   hasImage: boolean
@@ -74,14 +82,6 @@ const VIDEO_MIME_TYPES = [
   'video/webm;codecs=vp8,opus',
   'video/webm;codecs=h264,opus',
   'video/webm',
-]
-
-export const DEFAULT_FILTER_ORDER: FilterGroupKey[] = [
-  'rgbSplit',
-  'tears',
-  'squares',
-  'scanlines',
-  'streaks',
 ]
 
 const DEFAULT_BLOCK_CONTROLS: BlockControls = {
@@ -138,6 +138,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   let sketchInstance: p5 | null = null
   let blockControls: BlockControls = { ...DEFAULT_BLOCK_CONTROLS }
   let filterOrder: FilterGroupKey[] = [...DEFAULT_FILTER_ORDER]
+  let filterGroupState: FilterGroupState = { ...DEFAULT_FILTER_GROUP_STATE }
   let recorderDestination: MediaStreamAudioDestinationNode | null = null
   let recorderDestinationConnected = false
   let mediaRecorder: MediaRecorder | null = null
@@ -177,7 +178,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
           metrics,
           audio.currentTime,
           blockControls,
-          filterOrder,
+          resolveActiveFilterOrder(filterOrder, filterGroupState),
           {
             frequencies: frequencyData,
             waveform: waveformData,
@@ -473,6 +474,10 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     filterOrder = normalizeFilterOrder(nextOrder)
   }
 
+  const setFilterGroupState = (nextState: FilterGroupState) => {
+    filterGroupState = nextState
+  }
+
   const dispose = () => {
     void stopVideoRecording()
     audio.pause()
@@ -501,17 +506,9 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     getSnapshot,
     setBlockControls,
     setFilterOrder,
+    setFilterGroupState,
     dispose,
   }
-}
-
-const normalizeFilterOrder = (order: FilterGroupKey[]) => {
-  const ordered = order.filter((key, index) => {
-    return DEFAULT_FILTER_ORDER.includes(key) && order.indexOf(key) === index
-  })
-  const missing = DEFAULT_FILTER_ORDER.filter((key) => !ordered.includes(key))
-
-  return [...ordered, ...missing]
 }
 
 const getSupportedVideoMimeType = () => {

@@ -1,16 +1,20 @@
 import './style.css'
 import {
+  DEFAULT_FILTER_GROUP_STATE,
   DEFAULT_FILTER_ORDER,
   createGlitchSketch,
   formatTime,
   type BlockControls,
+  type FilterGroupState,
   type FilterGroupKey,
 } from './glitchSketch'
 import {
   loadStoredBlockControls,
+  loadStoredFilterGroupState,
   loadStoredFilterOrder,
   loadStoredMedia,
   saveStoredBlockControls,
+  saveStoredFilterGroupState,
   saveStoredFilterOrder,
   saveStoredMedia,
 } from './mediaStorage'
@@ -41,6 +45,7 @@ const DEFAULT_BLOCK_CONTROLS: BlockControls = {
 type ControlKey = keyof BlockControls
 
 type ControlGroup = {
+  filterKey?: FilterGroupKey
   name: string
   controls: Array<{
     key: ControlKey
@@ -51,6 +56,7 @@ type ControlGroup = {
 
 const CONTROL_GROUPS: ControlGroup[] = [
   {
+    filterKey: 'squares',
     name: 'Squares',
     controls: [
       {
@@ -81,6 +87,7 @@ const CONTROL_GROUPS: ControlGroup[] = [
     ],
   },
   {
+    filterKey: 'tears',
     name: 'Tears',
     controls: [
       {
@@ -101,6 +108,7 @@ const CONTROL_GROUPS: ControlGroup[] = [
     ],
   },
   {
+    filterKey: 'rgbSplit',
     name: 'RGB Split',
     controls: [
       {
@@ -136,6 +144,7 @@ const CONTROL_GROUPS: ControlGroup[] = [
     ],
   },
   {
+    filterKey: 'scanlines',
     name: 'Scanlines',
     controls: [
       {
@@ -151,6 +160,7 @@ const CONTROL_GROUPS: ControlGroup[] = [
     ],
   },
   {
+    filterKey: 'streaks',
     name: 'Streaks',
     controls: [
       {
@@ -195,8 +205,30 @@ const FILTER_GROUP_LABELS: Record<FilterGroupKey, string> = {
 }
 
 const renderControlGroup = (group: ControlGroup) => `
-  <section class="control-group">
-    <h2>${group.name}</h2>
+  <section class="control-group" ${group.filterKey ? `data-filter-control-group="${group.filterKey}"` : ''}>
+    <div class="control-group__head">
+      <h2>${group.name}</h2>
+      ${
+        group.filterKey
+          ? `
+            <div class="filter-toggles" aria-label="${group.name} filter controls">
+              <label class="toggle-field">
+                <input
+                  data-filter-enabled="${group.filterKey}"
+                  type="checkbox"
+                  checked
+                />
+                <span>Enable</span>
+              </label>
+              <label class="toggle-field toggle-field--solo">
+                <input data-filter-solo="${group.filterKey}" type="checkbox" />
+                <span>Solo</span>
+              </label>
+            </div>
+          `
+          : ''
+      }
+    </div>
     <div class="settings-row slider-row">
       ${group.controls
         .map(
@@ -319,7 +351,11 @@ const filterOrderList = document.querySelector<HTMLElement>(
 )!
 const controlSliders = new Map<ControlKey, HTMLInputElement>()
 const controlValues = new Map<ControlKey, HTMLElement>()
+const filterEnabledInputs = new Map<FilterGroupKey, HTMLInputElement>()
+const filterSoloInputs = new Map<FilterGroupKey, HTMLInputElement>()
+const filterGroupSections = new Map<FilterGroupKey, HTMLElement>()
 let filterOrder: FilterGroupKey[] = [...DEFAULT_FILTER_ORDER]
+let filterGroupState: FilterGroupState = { ...DEFAULT_FILTER_GROUP_STATE }
 
 for (const key of CONTROL_KEYS) {
   controlSliders.set(
@@ -329,6 +365,21 @@ for (const key of CONTROL_KEYS) {
   controlValues.set(
     key,
     document.querySelector<HTMLElement>(`[data-control-value="${key}"]`)!,
+  )
+}
+
+for (const key of DEFAULT_FILTER_ORDER) {
+  filterEnabledInputs.set(
+    key,
+    document.querySelector<HTMLInputElement>(`[data-filter-enabled="${key}"]`)!,
+  )
+  filterSoloInputs.set(
+    key,
+    document.querySelector<HTMLInputElement>(`[data-filter-solo="${key}"]`)!,
+  )
+  filterGroupSections.set(
+    key,
+    document.querySelector<HTMLElement>(`[data-filter-control-group="${key}"]`)!,
   )
 }
 
@@ -411,6 +462,25 @@ const applyFilterOrder = (nextOrder: FilterGroupKey[]) => {
   sketch.setFilterOrder(filterOrder)
   saveStoredFilterOrder(filterOrder)
   renderFilterOrder()
+}
+
+const applyFilterGroupState = (nextState: FilterGroupState) => {
+  filterGroupState = nextState
+  sketch.setFilterGroupState(filterGroupState)
+  saveStoredFilterGroupState(filterGroupState)
+
+  const hasSolo = DEFAULT_FILTER_ORDER.some((key) => filterGroupState[key].solo)
+
+  for (const key of DEFAULT_FILTER_ORDER) {
+    const state = filterGroupState[key]
+    const section = filterGroupSections.get(key)!
+
+    filterEnabledInputs.get(key)!.checked = state.enabled
+    filterSoloInputs.get(key)!.checked = state.solo
+    section.classList.toggle('is-disabled', !state.enabled)
+    section.classList.toggle('is-solo', state.solo)
+    section.classList.toggle('is-muted-by-solo', hasSolo && !state.solo)
+  }
 }
 
 const applyBlockControls = (controls: Partial<BlockControls>) => {
@@ -552,6 +622,28 @@ filterOrderList.addEventListener('click', (event) => {
   applyFilterOrder(nextOrder)
 })
 
+const readFilterGroupState = (): FilterGroupState => {
+  return DEFAULT_FILTER_ORDER.reduce<FilterGroupState>(
+    (state, key) => ({
+      ...state,
+      [key]: {
+        enabled: filterEnabledInputs.get(key)!.checked,
+        solo: filterSoloInputs.get(key)!.checked,
+      },
+    }),
+    { ...DEFAULT_FILTER_GROUP_STATE },
+  )
+}
+
+for (const input of [
+  ...filterEnabledInputs.values(),
+  ...filterSoloInputs.values(),
+]) {
+  input.addEventListener('change', () => {
+    applyFilterGroupState(readFilterGroupState())
+  })
+}
+
 for (const slider of controlSliders.values()) {
   slider.addEventListener('input', () => {
     syncBlockControls()
@@ -636,6 +728,7 @@ const restoreStoredMedia = async () => {
 
 applyBlockControls(loadStoredBlockControls() ?? DEFAULT_BLOCK_CONTROLS)
 applyFilterOrder(loadStoredFilterOrder() ?? DEFAULT_FILTER_ORDER)
+applyFilterGroupState(loadStoredFilterGroupState() ?? DEFAULT_FILTER_GROUP_STATE)
 syncBlockControls()
 syncUi()
 void restoreStoredMedia()

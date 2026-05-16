@@ -1,4 +1,10 @@
-import { DEFAULT_FILTER_ORDER, type BlockControls, type FilterGroupKey } from './glitchSketch'
+import type { BlockControls } from './glitchSketch'
+import {
+  normalizeFilterGroupState,
+  normalizeFilterOrder,
+  type FilterGroupKey,
+  type FilterGroupState,
+} from './filterState'
 
 type StoredMediaKind = 'image' | 'audio'
 
@@ -20,6 +26,7 @@ const DB_VERSION = 1
 const MANIFEST_KEY = 'glijs:selected-media'
 const BLOCK_CONTROLS_KEY = 'glijs:block-controls'
 const FILTER_ORDER_KEY = 'glijs:filter-order'
+const FILTER_GROUP_STATE_KEY = 'glijs:filter-group-state'
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -118,6 +125,28 @@ export function loadStoredFilterOrder(): FilterGroupKey[] | null {
   }
 }
 
+export function saveStoredFilterGroupState(state: FilterGroupState) {
+  localStorage.setItem(
+    FILTER_GROUP_STATE_KEY,
+    JSON.stringify(normalizeFilterGroupState(state)),
+  )
+}
+
+export function loadStoredFilterGroupState(): FilterGroupState | null {
+  const rawState = localStorage.getItem(FILTER_GROUP_STATE_KEY)
+
+  if (!rawState) {
+    return null
+  }
+
+  try {
+    return normalizeFilterGroupState(JSON.parse(rawState))
+  } catch {
+    localStorage.removeItem(FILTER_GROUP_STATE_KEY)
+    return null
+  }
+}
+
 const openMediaDb = () => {
   dbPromise ??= new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
@@ -193,21 +222,4 @@ const normalizeControlValue = (value: unknown) => {
   return typeof value === 'number' && Number.isFinite(value)
     ? Math.min(100, Math.max(0, value))
     : undefined
-}
-
-const normalizeFilterOrder = (value: unknown) => {
-  if (!Array.isArray(value)) {
-    return [...DEFAULT_FILTER_ORDER]
-  }
-
-  const ordered = value.filter((key, index): key is FilterGroupKey => {
-    return (
-      typeof key === 'string' &&
-      DEFAULT_FILTER_ORDER.includes(key as FilterGroupKey) &&
-      value.indexOf(key) === index
-    )
-  })
-  const missing = DEFAULT_FILTER_ORDER.filter((key) => !ordered.includes(key))
-
-  return [...ordered, ...missing]
 }
