@@ -9,6 +9,11 @@ import {
   type FilterGroupKey,
 } from './glitchSketch'
 import {
+  canRecordVideo,
+  canRenderVideo,
+  getRenderButtonLabel,
+} from './exportState'
+import {
   loadStoredBlockControls,
   loadStoredFilterGroupState,
   loadStoredFilterOrder,
@@ -403,6 +408,9 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
           <button data-record-video type="button" class="transport__button transport__button--secondary" disabled>
             Record video
           </button>
+          <button data-render-video type="button" class="transport__button transport__button--secondary" disabled>
+            Render & download
+          </button>
           <div class="transport__time">
             <span data-current-time>00:00</span>
             <span>/</span>
@@ -443,6 +451,9 @@ const audioInput = document.querySelector<HTMLInputElement>('[data-audio-input]'
 const playButton = document.querySelector<HTMLButtonElement>('[data-play]')!
 const recordButton = document.querySelector<HTMLButtonElement>(
   '[data-record-video]',
+)!
+const renderButton = document.querySelector<HTMLButtonElement>(
+  '[data-render-video]',
 )!
 const status = document.querySelector<HTMLElement>('[data-status]')!
 const imageName = document.querySelector<HTMLElement>('[data-image-name]')!
@@ -760,6 +771,19 @@ recordButton.addEventListener('click', async () => {
   }
 })
 
+renderButton.addEventListener('click', async () => {
+  try {
+    setStatusOverride('Rendering video for download...', 5000)
+    await sketch.renderVideoRecording()
+    syncUi()
+  } catch (error) {
+    setStatusOverride(
+      error instanceof Error ? error.message : 'Video render failed.',
+      4500,
+    )
+  }
+})
+
 filterOrderList.addEventListener('click', (event) => {
   const target = event.target
 
@@ -834,15 +858,23 @@ const syncUi = () => {
   const progressRatio =
     snapshot.duration > 0 ? snapshot.currentTime / snapshot.duration : 0
 
-  playButton.disabled = !snapshot.hasAudio
+  playButton.disabled =
+    !snapshot.hasAudio || snapshot.recording || snapshot.rendering
   playButton.textContent = snapshot.playing ? 'Pause' : 'Play'
-  recordButton.disabled = !snapshot.hasVisualMedia || !snapshot.hasAudio
+  recordButton.disabled = !canRecordVideo(snapshot)
   recordButton.textContent = snapshot.recording
     ? 'Stop & download'
     : 'Record video'
+  renderButton.disabled = !canRenderVideo(snapshot)
+  renderButton.textContent = getRenderButtonLabel(snapshot)
   currentTime.textContent = formatTime(snapshot.currentTime)
   duration.textContent = formatTime(snapshot.duration)
   progress.style.width = `${Math.min(100, Math.max(0, progressRatio * 100))}%`
+
+  if (snapshot.rendering) {
+    status.textContent = 'Rendering video for download...'
+    return
+  }
 
   if (snapshot.recording) {
     status.textContent = 'Recording video...'

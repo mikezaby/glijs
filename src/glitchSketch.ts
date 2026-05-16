@@ -66,6 +66,7 @@ type Snapshot = {
   hasAudio: boolean
   playing: boolean
   recording: boolean
+  rendering: boolean
   currentTime: number
   duration: number
 }
@@ -172,6 +173,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   let recorderDestination: MediaStreamAudioDestinationNode | null = null
   let recorderDestinationConnected = false
   let mediaRecorder: MediaRecorder | null = null
+  let renderingVideo = false
   let recordingStream: MediaStream | null = null
   let recordingChunks: Blob[] = []
   let stopRecordingPromise: Promise<void> | null = null
@@ -615,6 +617,21 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     await playVisualVideoFromAudio()
   }
 
+  const renderVideoRecording = async () => {
+    if (renderingVideo || mediaRecorder?.state === 'recording') {
+      return
+    }
+
+    renderingVideo = true
+
+    try {
+      await startVideoRecording()
+      await stopRecordingPromise
+    } finally {
+      renderingVideo = false
+    }
+  }
+
   const stopVideoRecording = async (
     { pauseAudio }: { pauseAudio: boolean } = { pauseAudio: true },
   ) => {
@@ -636,6 +653,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     hasAudio: Boolean(audio.src),
     playing: !audio.paused && !audio.ended,
     recording: mediaRecorder?.state === 'recording',
+    rendering: renderingVideo,
     currentTime: audio.currentTime,
     duration: Number.isFinite(audio.duration) ? audio.duration : 0,
   })
@@ -703,6 +721,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     togglePlayback,
     startVideoRecording,
     stopVideoRecording,
+    renderVideoRecording,
     getSnapshot,
     setBlockControls,
     setFilterOrder,
