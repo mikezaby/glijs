@@ -12,6 +12,15 @@ import {
   isVisualVideoDrawable,
   type VisualMediaKind,
 } from './visualMedia'
+import {
+  DEFAULT_VIDEO_RHYTHM_CONTROLS,
+  getVideoRhythmEnergy,
+  getVideoRhythmSeekTime,
+  normalizeVideoRhythmControls,
+  shouldResumeVideoSlice,
+  shouldTriggerVideoRhythmSeek,
+  type VideoRhythmControls,
+} from './videoRhythm'
 
 export {
   DEFAULT_FILTER_GROUP_STATE,
@@ -78,6 +87,7 @@ type AudioData = {
 type VisualSource = {
   kind: VisualMediaKind
   element: p5.Image | HTMLVideoElement
+  sliceElements?: HTMLVideoElement[]
   width: number
   height: number
 }
@@ -95,6 +105,7 @@ const VIDEO_MIME_TYPES = [
   'video/webm;codecs=h264,opus',
   'video/webm',
 ]
+const VIDEO_RHYTHM_SOURCE_COUNT = 8
 
 const DEFAULT_BLOCK_CONTROLS: BlockControls = {
   spread: 62,
@@ -151,6 +162,11 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   let blockControls: BlockControls = { ...DEFAULT_BLOCK_CONTROLS }
   let filterOrder: FilterGroupKey[] = [...DEFAULT_FILTER_ORDER]
   let filterGroupState: FilterGroupState = { ...DEFAULT_FILTER_GROUP_STATE }
+  let videoRhythmControls: VideoRhythmControls = {
+    ...DEFAULT_VIDEO_RHYTHM_CONTROLS,
+  }
+  let previousVideoRhythmEnergy = 0
+  let lastVideoRhythmSeekAt = 0
   let recorderDestination: MediaStreamAudioDestinationNode | null = null
   let recorderDestinationConnected = false
   let mediaRecorder: MediaRecorder | null = null
@@ -184,11 +200,13 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       drawBackdrop(instance, metrics, blockControls)
 
       if (loadedVisualSource && isVisualSourceDrawable(loadedVisualSource)) {
+        updateVideoRhythm(metrics, audio.currentTime, Date.now())
         drawImageLayers(
           instance,
           loadedVisualSource,
           metrics,
           audio.currentTime,
+          videoRhythmControls,
           blockControls,
           resolveActiveFilterOrder(filterOrder, filterGroupState),
           {
@@ -340,11 +358,18 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
 
     syncVisualVideoToAudio()
     video.muted = true
+
+    if (videoRhythmControls.mode === 'multi') {
+      await playVideoSlices()
+      return
+    }
+
     await video.play()
   }
 
   const pauseVisualVideo = () => {
     getVisualVideo()?.pause()
+    pauseVideoSlices()
   }
 
   const stopVisualVideo = () => {
@@ -355,12 +380,99 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     }
 
     video.pause()
+    pauseVideoSlices()
 
     try {
       video.currentTime = 0
+      for (const slice of loadedVisualSource?.sliceElements ?? []) {
+        slice.currentTime = 0
+      }
     } catch {
       // Ignore reset failures while the browser is still loading metadata.
     }
+  }
+
+  const playVideoSlices = async () => {
+    const neededSlices = getNeededVideoSliceCount(videoRhythmControls)
+
+    await Promise.all(
+      (loadedVisualSource?.sliceElements ?? [])
+        .slice(0, neededSlices)
+        .filter(shouldResumeVideoSlice)
+        .map((slice) => {
+          slice.muted = true
+          return slice.play()
+        }),
+    )
+  }
+
+  const pauseVideoSlices = () => {
+    for (const slice of loadedVisualSource?.sliceElements ?? []) {
+      slice.pause()
+    }
+  }
+
+  const updateVideoRhythm = (
+    nextMetrics: GlitchMetrics,
+    audioTime: number,
+    now: number,
+  ) => {
+    const video = getVisualVideo()
+
+    if (!video || audio.paused || audio.ended || videoRhythmControls.mode === 'normal') {
+      previousVideoRhythmEnergy = getVideoRhythmEnergy(
+        nextMetrics,
+        videoRhythmControls,
+      )
+      return
+    }
+
+    const shouldSeek = shouldTriggerVideoRhythmSeek({
+      controls: videoRhythmControls,
+      metrics: nextMetrics,
+      previousEnergy: previousVideoRhythmEnergy,
+      lastSeekAt: lastVideoRhythmSeekAt,
+      now,
+    })
+
+    previousVideoRhythmEnergy = getVideoRhythmEnergy(
+      nextMetrics,
+      videoRhythmControls,
+    )
+
+    if (!shouldSeek || !Number.isFinite(video.duration) || video.duration <= 0) {
+      return
+    }
+
+    lastVideoRhythmSeekAt = now
+
+    if (videoRhythmControls.mode === 'seek') {
+      video.currentTime = getVideoRhythmSeekTime({
+        audioTime,
+        duration: video.duration,
+        seekRange: videoRhythmControls.seekRange,
+        random: Math.random,
+      })
+      return
+    }
+
+    for (const [index, slice] of (
+      loadedVisualSource?.sliceElements ?? []
+    ).entries()) {
+      if (index >= getNeededVideoSliceCount(videoRhythmControls)) {
+        slice.pause()
+        continue
+      }
+
+      slice.currentTime = getVideoRhythmSeekTime({
+        audioTime,
+        duration: slice.duration || video.duration,
+        seekRange: videoRhythmControls.seekRange,
+        random: Math.random,
+      })
+    }
+
+    void playVideoSlices()
   }
 
   audio.addEventListener('ended', pauseVisualVideo)
@@ -557,6 +669,10 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     filterGroupState = nextState
   }
 
+  const setVideoRhythmControls = (nextControls: VideoRhythmControls) => {
+    videoRhythmControls = normalizeVideoRhythmControls(nextControls)
+  }
+
   const dispose = () => {
     void stopVideoRecording()
     audio.pause()
@@ -587,6 +703,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     setBlockControls,
     setFilterOrder,
     setFilterGroupState,
+    setVideoRhythmControls,
     dispose,
   }
 }
@@ -599,6 +716,7 @@ const loadImageSource = (instance: p5, url: string) => {
         resolve({
           kind: 'image',
           element: image,
+          sliceElements: undefined,
           width: image.width,
           height: image.height,
         })
@@ -612,13 +730,7 @@ const loadImageSource = (instance: p5, url: string) => {
 
 const loadVideoSource = (url: string) => {
   return new Promise<VisualSource>((resolve, reject) => {
-    const video = document.createElement('video')
-
-    video.muted = true
-    video.playsInline = true
-    video.preload = 'auto'
-    video.loop = true
-    video.src = url
+    const video = createDrawableVideo(url)
 
     const cleanup = () => {
       video.removeEventListener('loadeddata', handleLoaded)
@@ -627,9 +739,16 @@ const loadVideoSource = (url: string) => {
 
     const handleLoaded = () => {
       cleanup()
+      const sliceElements = Array.from({ length: VIDEO_RHYTHM_SOURCE_COUNT }, () => {
+        const slice = createDrawableVideo(url)
+        slice.load()
+        return slice
+      })
+
       resolve({
         kind: 'video',
         element: video,
+        sliceElements,
         width: video.videoWidth,
         height: video.videoHeight,
       })
@@ -646,12 +765,35 @@ const loadVideoSource = (url: string) => {
   })
 }
 
+const createDrawableVideo = (url: string) => {
+  const video = document.createElement('video')
+
+  video.muted = true
+  video.playsInline = true
+  video.preload = 'auto'
+  video.loop = true
+  video.src = url
+
+  return video
+}
+
 const isVisualSourceDrawable = (visualSource: VisualSource) => {
   if (visualSource.kind === 'image') {
     return visualSource.width > 0 && visualSource.height > 0
   }
 
   return isVisualVideoDrawable(visualSource.element as HTMLVideoElement)
+}
+
+const getNeededVideoSliceCount = (controls: VideoRhythmControls) => {
+  if (controls.mode !== 'multi') {
+    return 0
+  }
+
+  return Math.min(
+    VIDEO_RHYTHM_SOURCE_COUNT,
+    Math.max(1, Math.round(controls.slices)),
+  )
 }
 
 const getSupportedVideoMimeType = () => {
@@ -735,6 +877,7 @@ const drawImageLayers = (
   visualSource: VisualSource,
   metrics: GlitchMetrics,
   audioTime: number,
+  videoRhythmControls: VideoRhythmControls,
   blockControls: BlockControls,
   filterOrder: FilterGroupKey[],
   audioData: AudioData,
@@ -752,7 +895,15 @@ const drawImageLayers = (
 
   instance.push()
   instance.blendMode(instance.BLEND)
-  drawVisualSource(instance, visualSource, x, y, bounds.width, bounds.height)
+  drawVisualSource(
+    instance,
+    visualSource,
+    videoRhythmControls,
+    x,
+    y,
+    bounds.width,
+    bounds.height,
+  )
   instance.pop()
 
   for (const group of filterOrder) {
@@ -781,6 +932,7 @@ const drawImageLayers = (
 const drawVisualSource = (
   instance: p5,
   visualSource: VisualSource,
+  videoRhythmControls: VideoRhythmControls,
   x: number,
   y: number,
   width: number,
@@ -796,8 +948,137 @@ const drawVisualSource = (
 
   context.save()
   context.globalAlpha = 244 / 255
-  context.drawImage(visualSource.element as HTMLVideoElement, x, y, width, height)
+  if (videoRhythmControls.mode === 'multi' && visualSource.sliceElements?.length) {
+    drawVideoSlices(
+      context,
+      visualSource,
+      videoRhythmControls,
+      x,
+      y,
+      width,
+      height,
+      instance.frameCount,
+    )
+  } else {
+    context.drawImage(visualSource.element as HTMLVideoElement, x, y, width, height)
+  }
   context.restore()
+}
+
+const drawVideoSlices = (
+  context: CanvasRenderingContext2D,
+  visualSource: VisualSource,
+  videoRhythmControls: VideoRhythmControls,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  frameCount: number,
+) => {
+  const sources = visualSource.sliceElements ?? []
+  const sliceCount = Math.max(1, Math.round(videoRhythmControls.slices))
+
+  if (videoRhythmControls.shape === 'cubes') {
+    drawVideoCubes(
+      context,
+      visualSource,
+      sources,
+      videoRhythmControls,
+      x,
+      y,
+      width,
+      height,
+      frameCount,
+      sliceCount,
+    )
+    return
+  }
+
+  const sourceHeight = visualSource.height / sliceCount
+  const targetHeight = height / sliceCount
+  const motion = (videoRhythmControls.motion / 100) * 28
+  const overlap = motion + 2
+
+  for (let index = 0; index < sliceCount; index += 1) {
+    const sliceSource = sources[index % sources.length]
+    const source = isVisualVideoDrawable(sliceSource)
+      ? sliceSource
+      : (visualSource.element as HTMLVideoElement)
+    const drift = getVideoPieceDrift(index, frameCount, motion)
+
+    context.drawImage(
+      source,
+      0,
+      index * sourceHeight,
+      visualSource.width,
+      sourceHeight,
+      x + drift.x - overlap,
+      y + index * targetHeight + drift.y - overlap,
+      width + overlap * 2,
+      targetHeight + overlap * 2 + 1,
+    )
+  }
+}
+
+const drawVideoCubes = (
+  context: CanvasRenderingContext2D,
+  visualSource: VisualSource,
+  sources: HTMLVideoElement[],
+  videoRhythmControls: VideoRhythmControls,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  frameCount: number,
+  pieceCount: number,
+) => {
+  const columns = Math.ceil(Math.sqrt(pieceCount))
+  const rows = Math.ceil(pieceCount / columns)
+  const sourceCellWidth = visualSource.width / columns
+  const sourceCellHeight = visualSource.height / rows
+  const targetCellWidth = width / columns
+  const targetCellHeight = height / rows
+  const motion = (videoRhythmControls.motion / 100) * 34
+  const overlap = motion + 2
+
+  for (let index = 0; index < pieceCount; index += 1) {
+    const column = index % columns
+    const row = Math.floor(index / columns)
+    const sliceSource = sources[index % sources.length]
+    const source = isVisualVideoDrawable(sliceSource)
+      ? sliceSource
+      : (visualSource.element as HTMLVideoElement)
+    const drift = getVideoPieceDrift(index, frameCount, motion)
+
+    context.drawImage(
+      source,
+      column * sourceCellWidth,
+      row * sourceCellHeight,
+      sourceCellWidth,
+      sourceCellHeight,
+      x + column * targetCellWidth + drift.x - overlap,
+      y + row * targetCellHeight + drift.y - overlap,
+      targetCellWidth + overlap * 2 + 1,
+      targetCellHeight + overlap * 2 + 1,
+    )
+  }
+}
+
+const getVideoPieceDrift = (
+  index: number,
+  frameCount: number,
+  motion: number,
+) => {
+  if (motion <= 0) {
+    return { x: 0, y: 0 }
+  }
+
+  const time = frameCount * 0.045
+
+  return {
+    x: Math.sin(time + index * 12.9898) * motion,
+    y: Math.cos(time * 1.17 + index * 78.233) * motion,
+  }
 }
 
 const drawRgbSplit = (

@@ -13,11 +13,19 @@ import {
   loadStoredFilterGroupState,
   loadStoredFilterOrder,
   loadStoredMedia,
+  loadStoredVideoRhythmControls,
   saveStoredBlockControls,
   saveStoredFilterGroupState,
   saveStoredFilterOrder,
   saveStoredMedia,
+  saveStoredVideoRhythmControls,
 } from './mediaStorage'
+import {
+  DEFAULT_VIDEO_RHYTHM_CONTROLS,
+  type VideoRhythmControls,
+  type VideoRhythmMode,
+  type VideoRhythmShape,
+} from './videoRhythm'
 
 const DEFAULT_BLOCK_CONTROLS: BlockControls = {
   spread: 62,
@@ -204,6 +212,57 @@ const FILTER_GROUP_LABELS: Record<FilterGroupKey, string> = {
   streaks: 'Streaks',
 }
 
+const VIDEO_RHYTHM_CONTROL_FIELDS: Array<{
+  key: keyof Omit<VideoRhythmControls, 'mode'>
+  label: string
+  title: string
+  min: number
+  max: number
+}> = [
+  {
+    key: 'sensitivity',
+    label: 'Sensitivity',
+    title: 'Controls how easily the audio triggers video seek jumps.',
+    min: 0,
+    max: 100,
+  },
+  {
+    key: 'bass',
+    label: 'Bass',
+    title: 'Controls how strongly bass energy pushes video seeking.',
+    min: 0,
+    max: 100,
+  },
+  {
+    key: 'treble',
+    label: 'Highs',
+    title: 'Controls how strongly high frequencies push video seeking.',
+    min: 0,
+    max: 100,
+  },
+  {
+    key: 'seekRange',
+    label: 'Range',
+    title: 'Controls how far from normal playback seek jumps can travel.',
+    min: 0,
+    max: 100,
+  },
+  {
+    key: 'slices',
+    label: 'Pieces',
+    title: 'Controls how many strips or cubes are drawn in multi-seek mode.',
+    min: 1,
+    max: 200,
+  },
+  {
+    key: 'motion',
+    label: 'Motion',
+    title: 'Controls how randomly strips or cubes move around the picture.',
+    min: 0,
+    max: 100,
+  },
+]
+
 const renderControlGroup = (group: ControlGroup) => `
   <section class="control-group" ${group.filterKey ? `data-filter-control-group="${group.filterKey}"` : ''}>
     <div class="control-group__head">
@@ -251,6 +310,50 @@ const renderControlGroup = (group: ControlGroup) => `
           `,
         )
         .join('')}
+    </div>
+  </section>
+`
+
+const renderVideoRhythmControls = () => `
+  <section class="control-group">
+    <div class="control-group__head">
+      <h2>Video rhythm</h2>
+    </div>
+    <label class="select-field" title="Controls how video time reacts to the WAV analysis.">
+      <span>Mode</span>
+      <select data-video-rhythm-mode>
+        <option value="normal">Normal playback</option>
+        <option value="seek">Rhythm seek</option>
+        <option value="multi">Multi-seek slices</option>
+      </select>
+    </label>
+    <label class="select-field" title="Controls the visual structure used by multi-seek mode.">
+      <span>Shape</span>
+      <select data-video-rhythm-shape>
+        <option value="strips">Strips</option>
+        <option value="cubes">Cubes</option>
+      </select>
+    </label>
+    <div class="settings-row slider-row">
+      ${VIDEO_RHYTHM_CONTROL_FIELDS.map(
+        (control) => `
+          <label class="slider-field" title="${control.title}">
+            <div class="slider-field__head">
+              <span>${control.label}</span>
+              <strong data-video-rhythm-value="${control.key}">
+                ${DEFAULT_VIDEO_RHYTHM_CONTROLS[control.key]}
+              </strong>
+            </div>
+            <input
+              data-video-rhythm-slider="${control.key}"
+              type="range"
+              min="${control.min}"
+              max="${control.max}"
+              value="${DEFAULT_VIDEO_RHYTHM_CONTROLS[control.key]}"
+            />
+          </label>
+        `,
+      ).join('')}
     </div>
   </section>
 `
@@ -314,6 +417,8 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 
       <p class="status" data-status>Load image or video and WAV.</p>
 
+      ${renderVideoRhythmControls()}
+
       <section class="control-group">
         <h2>Filter order</h2>
         <div class="filter-order" data-filter-order-list></div>
@@ -349,13 +454,30 @@ const sketchHost = document.querySelector<HTMLElement>('#sketch-host')!
 const filterOrderList = document.querySelector<HTMLElement>(
   '[data-filter-order-list]',
 )!
+const videoRhythmMode = document.querySelector<HTMLSelectElement>(
+  '[data-video-rhythm-mode]',
+)!
+const videoRhythmShape = document.querySelector<HTMLSelectElement>(
+  '[data-video-rhythm-shape]',
+)!
 const controlSliders = new Map<ControlKey, HTMLInputElement>()
 const controlValues = new Map<ControlKey, HTMLElement>()
+const videoRhythmSliders = new Map<
+  keyof Omit<VideoRhythmControls, 'mode'>,
+  HTMLInputElement
+>()
+const videoRhythmValues = new Map<
+  keyof Omit<VideoRhythmControls, 'mode'>,
+  HTMLElement
+>()
 const filterEnabledInputs = new Map<FilterGroupKey, HTMLInputElement>()
 const filterSoloInputs = new Map<FilterGroupKey, HTMLInputElement>()
 const filterGroupSections = new Map<FilterGroupKey, HTMLElement>()
 let filterOrder: FilterGroupKey[] = [...DEFAULT_FILTER_ORDER]
 let filterGroupState: FilterGroupState = { ...DEFAULT_FILTER_GROUP_STATE }
+let videoRhythmControls: VideoRhythmControls = {
+  ...DEFAULT_VIDEO_RHYTHM_CONTROLS,
+}
 
 for (const key of CONTROL_KEYS) {
   controlSliders.set(
@@ -365,6 +487,21 @@ for (const key of CONTROL_KEYS) {
   controlValues.set(
     key,
     document.querySelector<HTMLElement>(`[data-control-value="${key}"]`)!,
+  )
+}
+
+for (const control of VIDEO_RHYTHM_CONTROL_FIELDS) {
+  videoRhythmSliders.set(
+    control.key,
+    document.querySelector<HTMLInputElement>(
+      `[data-video-rhythm-slider="${control.key}"]`,
+    )!,
+  )
+  videoRhythmValues.set(
+    control.key,
+    document.querySelector<HTMLElement>(
+      `[data-video-rhythm-value="${control.key}"]`,
+    )!,
   )
 }
 
@@ -493,6 +630,21 @@ const applyBlockControls = (controls: Partial<BlockControls>) => {
   }
 }
 
+const applyVideoRhythmControls = (controls: VideoRhythmControls) => {
+  videoRhythmControls = controls
+  videoRhythmMode.value = controls.mode
+  videoRhythmShape.value = controls.shape
+
+  for (const field of VIDEO_RHYTHM_CONTROL_FIELDS) {
+    videoRhythmSliders.get(field.key)!.value = String(controls[field.key])
+    videoRhythmValues.get(field.key)!.textContent =
+      field.key === 'slices' ? String(controls[field.key]) : `${controls[field.key]}%`
+  }
+
+  sketch.setVideoRhythmControls(videoRhythmControls)
+  saveStoredVideoRhythmControls(videoRhythmControls)
+}
+
 const setSettingsOpen = (open: boolean) => {
   settingsPanel.classList.toggle('is-open', open)
   settingsToggle.classList.toggle('is-open', open)
@@ -519,6 +671,19 @@ const syncBlockControls = () => {
 
   sketch.setBlockControls(controls)
   saveStoredBlockControls(controls)
+}
+
+const readVideoRhythmControls = (): VideoRhythmControls => {
+  return {
+    mode: videoRhythmMode.value as VideoRhythmMode,
+    shape: videoRhythmShape.value as VideoRhythmShape,
+    sensitivity: Number(videoRhythmSliders.get('sensitivity')!.value),
+    bass: Number(videoRhythmSliders.get('bass')!.value),
+    treble: Number(videoRhythmSliders.get('treble')!.value),
+    seekRange: Number(videoRhythmSliders.get('seekRange')!.value),
+    slices: Number(videoRhythmSliders.get('slices')!.value),
+    motion: Number(videoRhythmSliders.get('motion')!.value),
+  }
 }
 
 settingsToggle.addEventListener('click', () => {
@@ -650,6 +815,20 @@ for (const slider of controlSliders.values()) {
   })
 }
 
+videoRhythmMode.addEventListener('change', () => {
+  applyVideoRhythmControls(readVideoRhythmControls())
+})
+
+videoRhythmShape.addEventListener('change', () => {
+  applyVideoRhythmControls(readVideoRhythmControls())
+})
+
+for (const slider of videoRhythmSliders.values()) {
+  slider.addEventListener('input', () => {
+    applyVideoRhythmControls(readVideoRhythmControls())
+  })
+}
+
 const syncUi = () => {
   const snapshot = sketch.getSnapshot()
   const progressRatio =
@@ -729,6 +908,9 @@ const restoreStoredMedia = async () => {
 applyBlockControls(loadStoredBlockControls() ?? DEFAULT_BLOCK_CONTROLS)
 applyFilterOrder(loadStoredFilterOrder() ?? DEFAULT_FILTER_ORDER)
 applyFilterGroupState(loadStoredFilterGroupState() ?? DEFAULT_FILTER_GROUP_STATE)
+applyVideoRhythmControls(
+  loadStoredVideoRhythmControls() ?? DEFAULT_VIDEO_RHYTHM_CONTROLS,
+)
 syncBlockControls()
 syncUi()
 void restoreStoredMedia()

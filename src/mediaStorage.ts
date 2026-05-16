@@ -5,6 +5,10 @@ import {
   type FilterGroupKey,
   type FilterGroupState,
 } from './filterState'
+import {
+  normalizeVideoRhythmControls,
+  type VideoRhythmControls,
+} from './videoRhythm'
 
 type StoredMediaKind = 'image' | 'audio'
 
@@ -27,6 +31,7 @@ const MANIFEST_KEY = 'glijs:selected-media'
 const BLOCK_CONTROLS_KEY = 'glijs:block-controls'
 const FILTER_ORDER_KEY = 'glijs:filter-order'
 const FILTER_GROUP_STATE_KEY = 'glijs:filter-group-state'
+const VIDEO_RHYTHM_CONTROLS_KEY = 'glijs:video-rhythm-controls'
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -143,6 +148,28 @@ export function loadStoredFilterGroupState(): FilterGroupState | null {
     return normalizeFilterGroupState(JSON.parse(rawState))
   } catch {
     localStorage.removeItem(FILTER_GROUP_STATE_KEY)
+    return null
+  }
+}
+
+export function saveStoredVideoRhythmControls(controls: VideoRhythmControls) {
+  localStorage.setItem(
+    VIDEO_RHYTHM_CONTROLS_KEY,
+    JSON.stringify(normalizeVideoRhythmControls(controls)),
+  )
+}
+
+export function loadStoredVideoRhythmControls(): VideoRhythmControls | null {
+  const rawControls = localStorage.getItem(VIDEO_RHYTHM_CONTROLS_KEY)
+
+  if (!rawControls) {
+    return null
+  }
+
+  try {
+    return normalizeVideoRhythmControls(JSON.parse(rawControls))
+  } catch {
+    localStorage.removeItem(VIDEO_RHYTHM_CONTROLS_KEY)
     return null
   }
 }

@@ -271,6 +271,7 @@ input {
 }
 
 .file-field,
+.select-field,
 .slider-field {
   display: grid;
   gap: 7px;
@@ -278,6 +279,7 @@ input {
 }
 
 .file-field span,
+.select-field span,
 .slider-field__head span {
   color: var(--text);
   font-size: 0.82rem;
@@ -313,6 +315,16 @@ input {
   color: #070707;
   font-weight: 700;
   cursor: pointer;
+}
+
+.select-field select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 9px;
+  background: var(--panel);
+  color: var(--text);
 }
 
 .transport {
