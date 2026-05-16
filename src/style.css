@@ -10,6 +10,7 @@
   --cool: #56d7ff;
   --radius: 8px;
   --font: 'Avenir Next', 'Helvetica Neue', sans-serif;
+  --settings-width: min(460px, calc(100vw - 40px));
 
   font: 15px/1.4 var(--font);
   color: var(--text);
@@ -65,35 +66,82 @@ input {
 
 .settings-toggle {
   position: fixed;
-  z-index: 30;
-  top: 12px;
-  right: 12px;
+  z-index: 50;
+  top: 50%;
+  right: 0;
+  width: 34px;
+  height: 86px;
+  display: grid;
+  place-items: center;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 10px 14px;
-  background: rgba(17, 17, 17, 0.86);
+  border-right: 0;
+  border-radius: var(--radius) 0 0 var(--radius);
+  padding: 0;
+  background: rgba(17, 17, 17, 0.94);
   color: var(--text);
   cursor: pointer;
   backdrop-filter: blur(14px);
+  box-shadow: -10px 12px 36px rgba(0, 0, 0, 0.38);
+  transform: translateY(-50%);
+  transition:
+    right 180ms ease,
+    background 180ms ease,
+    border-color 180ms ease;
+}
+
+.settings-toggle.is-open {
+  right: calc(var(--settings-width) - 1px);
+  border-color: rgba(244, 241, 234, 0.22);
+  background: rgba(9, 9, 9, 0.92);
+}
+
+.settings-toggle__grip {
+  width: 3px;
+  height: 42px;
+  border-radius: 999px;
+  background: var(--muted);
+  box-shadow:
+    -6px 0 0 rgba(141, 141, 141, 0.62),
+    6px 0 0 rgba(141, 141, 141, 0.62);
+}
+
+.settings-toggle::after {
+  width: 7px;
+  height: 7px;
+  border-top: 2px solid var(--accent);
+  border-left: 2px solid var(--accent);
+  content: '';
+  position: absolute;
+  right: 8px;
+  transform: rotate(-45deg);
+}
+
+.settings-toggle.is-open::after {
+  right: 13px;
+  transform: rotate(135deg);
 }
 
 .settings {
   position: fixed;
   z-index: 40;
-  top: 12px;
-  right: 12px;
-  width: min(390px, calc(100vw - 24px));
-  max-height: calc(100vh - 24px);
+  top: 0;
+  right: 0;
+  width: var(--settings-width);
+  height: 100vh;
+  max-height: 100vh;
   display: grid;
   gap: 12px;
   overflow: auto;
-  padding: 14px;
+  padding: 16px;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
   background: rgba(9, 9, 9, 0.88);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(18px);
-  transform: translateX(calc(100% + 24px));
+  transform: translateX(100%);
   transition: transform 180ms ease;
 }
 
@@ -342,17 +390,7 @@ input {
 }
 
 @media (max-width: 860px) {
-  .settings {
-    top: auto;
-    right: 8px;
-    bottom: 8px;
-    left: 8px;
-    width: auto;
-    max-height: min(72vh, 560px);
-    transform: translateY(calc(100% + 16px));
-  }
-
-  .settings.is-open {
-    transform: translateY(0);
+  :root {
+    --settings-width: min(430px, calc(100vw - 38px));
   }
 }

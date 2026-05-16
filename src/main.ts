@@ -227,12 +227,13 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <main class="shell">
     <button
       data-settings-toggle
-      class="settings-toggle"
+      class="settings-toggle is-open"
       type="button"
       aria-expanded="true"
       aria-controls="settings-panel"
+      aria-label="Hide settings"
     >
-      Settings
+      <span class="settings-toggle__grip" aria-hidden="true"></span>
     </button>
 
     <section class="stage">
@@ -424,8 +425,9 @@ const applyBlockControls = (controls: Partial<BlockControls>) => {
 
 const setSettingsOpen = (open: boolean) => {
   settingsPanel.classList.toggle('is-open', open)
+  settingsToggle.classList.toggle('is-open', open)
   settingsToggle.setAttribute('aria-expanded', String(open))
-  settingsToggle.textContent = open ? 'Hide settings' : 'Settings'
+  settingsToggle.setAttribute('aria-label', open ? 'Hide settings' : 'Show settings')
 }
 
 const readBlockControls = (): BlockControls => {
