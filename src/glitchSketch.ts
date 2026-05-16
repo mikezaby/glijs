@@ -8,6 +8,7 @@ import {
   type FilterGroupState,
 } from './filterState'
 import {
+  getDrawableVisualVideoIndex,
   getVisualMediaKind,
   isVisualVideoDrawable,
   type VisualMediaKind,
@@ -1073,10 +1074,11 @@ const drawVideoSlices = (
   const overlap = getVideoRhythmPieceOverscan(motion)
 
   for (let index = 0; index < sliceCount; index += 1) {
-    const sliceSource = sources[index % sources.length]
-    const source = isVisualVideoDrawable(sliceSource)
-      ? sliceSource
-      : (visualSource.element as HTMLVideoElement)
+    const source = getVideoPieceSource(
+      sources,
+      index,
+      visualSource.element as HTMLVideoElement,
+    )
     const drift = getVideoPieceDrift(index, frameCount, motion)
 
     context.drawImage(
@@ -1091,6 +1093,20 @@ const drawVideoSlices = (
       targetHeight + overlap * 2 + 1,
     )
   }
+}
+
+const getVideoPieceSource = (
+  sources: HTMLVideoElement[],
+  index: number,
+  primary: HTMLVideoElement,
+) => {
+  if (sources.length === 0) {
+    return primary
+  }
+
+  const sourceIndex = getDrawableVisualVideoIndex(sources, index % sources.length)
+
+  return sourceIndex >= 0 ? sources[sourceIndex] : sources[index % sources.length]
 }
 
 const drawVideoCubes = (
@@ -1117,10 +1133,11 @@ const drawVideoCubes = (
   for (let index = 0; index < pieceCount; index += 1) {
     const column = index % columns
     const row = Math.floor(index / columns)
-    const sliceSource = sources[index % sources.length]
-    const source = isVisualVideoDrawable(sliceSource)
-      ? sliceSource
-      : (visualSource.element as HTMLVideoElement)
+    const source = getVideoPieceSource(
+      sources,
+      index,
+      visualSource.element as HTMLVideoElement,
+    )
     const drift = getVideoPieceDrift(index, frameCount, motion)
 
     context.drawImage(

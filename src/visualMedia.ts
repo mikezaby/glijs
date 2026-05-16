@@ -27,3 +27,16 @@ export const getVisualMediaKind = (
 export const isVisualVideoDrawable = (video: VisualVideoStateLike) => {
   return video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0
 }
+
+export const getDrawableVisualVideoIndex = (
+  videos: VisualVideoStateLike[],
+  preferredIndex = 0,
+) => {
+  const preferred = videos[preferredIndex]
+
+  if (preferred && isVisualVideoDrawable(preferred)) {
+    return preferredIndex
+  }
+
+  return videos.findIndex(isVisualVideoDrawable)
+}
