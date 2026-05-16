@@ -13,6 +13,12 @@ import {
   shouldTriggerVideoRhythmSeek,
 } from '../src/videoRhythm.ts'
 
+test('uses cube demo-friendly video rhythm defaults', () => {
+  assert.equal(DEFAULT_VIDEO_RHYTHM_CONTROLS.shape, 'cubes')
+  assert.equal(DEFAULT_VIDEO_RHYTHM_CONTROLS.slices, 9)
+  assert.equal(DEFAULT_VIDEO_RHYTHM_CONTROLS.seekRange, 23)
+})
+
 test('does not trigger video seeks in normal playback mode', () => {
   assert.equal(
     shouldTriggerVideoRhythmSeek({
