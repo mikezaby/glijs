@@ -13,6 +13,7 @@ import {
   canRenderVideo,
   getRenderButtonLabel,
 } from './exportState'
+import { renderInfoTooltip } from './infoTooltip'
 import {
   loadStoredBlockControls,
   loadStoredFilterGroupState,
@@ -306,7 +307,10 @@ const renderControlGroup = (group: ControlGroup) => `
           (control) => `
             <label class="slider-field" title="${control.title}">
               <div class="slider-field__head">
-                <span>${control.label}</span>
+                <span class="field-label">
+                  ${control.label}
+                  ${renderInfoTooltip(control.title)}
+                </span>
                 <strong data-control-value="${control.key}">
                   ${DEFAULT_BLOCK_CONTROLS[control.key]}%
                 </strong>
@@ -332,7 +336,10 @@ const renderVideoRhythmControls = () => `
       <h2>Video rhythm</h2>
     </div>
     <label class="select-field" title="Controls how video time reacts to the WAV analysis.">
-      <span>Mode</span>
+      <span class="field-label">
+        Mode
+        ${renderInfoTooltip('Controls how video time reacts to the WAV analysis.')}
+      </span>
       <select data-video-rhythm-mode>
         <option value="normal">Normal playback</option>
         <option value="seek">Rhythm seek</option>
@@ -340,7 +347,10 @@ const renderVideoRhythmControls = () => `
       </select>
     </label>
     <label class="select-field" title="Controls the visual structure used by multi-seek mode.">
-      <span>Shape</span>
+      <span class="field-label">
+        Shape
+        ${renderInfoTooltip('Controls the visual structure used by multi-seek mode.')}
+      </span>
       <select data-video-rhythm-shape>
         <option value="strips">Strips</option>
         <option value="cubes">Cubes</option>
@@ -351,7 +361,10 @@ const renderVideoRhythmControls = () => `
         (control) => `
           <label class="slider-field" title="${control.title}">
             <div class="slider-field__head">
-              <span>${control.label}</span>
+              <span class="field-label">
+                ${control.label}
+                ${renderInfoTooltip(control.title)}
+              </span>
               <strong data-video-rhythm-value="${control.key}">
                 ${DEFAULT_VIDEO_RHYTHM_CONTROLS[control.key]}
               </strong>

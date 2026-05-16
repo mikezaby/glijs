@@ -278,13 +278,61 @@ input {
   min-width: 0;
 }
 
-.file-field span,
-.select-field span,
-.slider-field__head span {
+.file-field > span,
+.field-label {
+  display: inline-flex;
+  position: relative;
+  gap: 6px;
+  align-items: center;
+  width: fit-content;
   color: var(--text);
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.info-tooltip {
+  display: inline-flex;
+  position: relative;
+  justify-content: center;
+  align-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: help;
+}
+
+.info-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  z-index: 4;
+  bottom: calc(100% + 8px);
+  left: 0;
+  display: none;
+  width: min(260px, 70vw);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-transform: none;
+  letter-spacing: 0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+}
+
+.info-tooltip:hover::after,
+.info-tooltip:focus-visible::after {
+  display: block;
 }
 
 .file-field small,
