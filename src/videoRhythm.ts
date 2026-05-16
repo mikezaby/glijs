@@ -16,6 +16,7 @@ export type VideoRhythmControls = {
   seekRange: number
   slices: number
   motion: number
+  mergeDelay: number
 }
 
 export type VideoRhythmSeekOptions = {
@@ -38,6 +39,13 @@ export type SlicePlaybackStateLike = {
   readyState: number
 }
 
+export type VideoRhythmIdleMergeStepOptions = {
+  lastSeekAt: number
+  now: number
+  mergeDelay: number
+  sourceCount: number
+}
+
 export const DEFAULT_VIDEO_RHYTHM_CONTROLS: VideoRhythmControls = {
   mode: 'normal',
   shape: 'strips',
@@ -47,6 +55,7 @@ export const DEFAULT_VIDEO_RHYTHM_CONTROLS: VideoRhythmControls = {
   seekRange: 70,
   slices: 6,
   motion: 35,
+  mergeDelay: 4,
 }
 
 const SEEK_COOLDOWN_MS = 120
@@ -135,6 +144,22 @@ export const getVideoRhythmPieceOverscan = (motion: number) => {
   return Math.max(2, Math.ceil(Math.max(0, motion) * 2 + 2))
 }
 
+export const getVideoRhythmIdleMergeStep = ({
+  lastSeekAt,
+  now,
+  mergeDelay,
+  sourceCount,
+}: VideoRhythmIdleMergeStepOptions) => {
+  if (lastSeekAt <= 0 || sourceCount <= 1) {
+    return 0
+  }
+
+  const delayMs = normalizeMergeDelay(mergeDelay) * 1000
+  const elapsedMs = Math.max(0, now - lastSeekAt)
+
+  return Math.min(sourceCount - 1, Math.floor(elapsedMs / delayMs))
+}
+
 export const normalizeVideoRhythmControls = (
   controls: Partial<VideoRhythmControls> | null | undefined,
 ): VideoRhythmControls => {
@@ -151,6 +176,7 @@ export const normalizeVideoRhythmControls = (
     seekRange: normalizePercent(controls?.seekRange, 70),
     slices: normalizeInteger(controls?.slices, 1, 200, 6),
     motion: normalizePercent(controls?.motion, 35),
+    mergeDelay: normalizeMergeDelay(controls?.mergeDelay),
   }
 }
 
@@ -177,6 +203,12 @@ const normalizeInteger = (
   return typeof value === 'number' && Number.isFinite(value)
     ? Math.round(clamp(value, min, max))
     : fallback
+}
+
+const normalizeMergeDelay = (value: unknown) => {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? clamp(value, 0, 10)
+    : DEFAULT_VIDEO_RHYTHM_CONTROLS.mergeDelay
 }
 
 const clamp = (value: number, min: number, max: number) => {

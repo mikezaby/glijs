@@ -218,7 +218,7 @@ const FILTER_GROUP_LABELS: Record<FilterGroupKey, string> = {
 }
 
 const VIDEO_RHYTHM_CONTROL_FIELDS: Array<{
-  key: keyof Omit<VideoRhythmControls, 'mode'>
+  key: keyof Omit<VideoRhythmControls, 'mode' | 'shape'>
   label: string
   title: string
   min: number
@@ -265,6 +265,13 @@ const VIDEO_RHYTHM_CONTROL_FIELDS: Array<{
     title: 'Controls how randomly strips or cubes move around the picture.',
     min: 0,
     max: 100,
+  },
+  {
+    key: 'mergeDelay',
+    label: 'Merge delay',
+    title: 'Controls how long quiet sections wait before older seeks cascade through the pieces.',
+    min: 0,
+    max: 10,
   },
 ]
 
@@ -474,11 +481,11 @@ const videoRhythmShape = document.querySelector<HTMLSelectElement>(
 const controlSliders = new Map<ControlKey, HTMLInputElement>()
 const controlValues = new Map<ControlKey, HTMLElement>()
 const videoRhythmSliders = new Map<
-  keyof Omit<VideoRhythmControls, 'mode'>,
+  keyof Omit<VideoRhythmControls, 'mode' | 'shape'>,
   HTMLInputElement
 >()
 const videoRhythmValues = new Map<
-  keyof Omit<VideoRhythmControls, 'mode'>,
+  keyof Omit<VideoRhythmControls, 'mode' | 'shape'>,
   HTMLElement
 >()
 const filterEnabledInputs = new Map<FilterGroupKey, HTMLInputElement>()
@@ -694,6 +701,7 @@ const readVideoRhythmControls = (): VideoRhythmControls => {
     seekRange: Number(videoRhythmSliders.get('seekRange')!.value),
     slices: Number(videoRhythmSliders.get('slices')!.value),
     motion: Number(videoRhythmSliders.get('motion')!.value),
+    mergeDelay: Number(videoRhythmSliders.get('mergeDelay')!.value),
   }
 }
 

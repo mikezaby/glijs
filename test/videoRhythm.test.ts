@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   DEFAULT_VIDEO_RHYTHM_CONTROLS,
+  getVideoRhythmIdleMergeStep,
   getVideoRhythmPieceOverscan,
   getVideoRhythmSeekSourceCount,
   getVideoRhythmTriggerThreshold,
@@ -123,4 +124,39 @@ test('uses only slice videos as multi seek sources', () => {
 
 test('overscans moving video pieces enough to cover motion gaps', () => {
   assert.equal(getVideoRhythmPieceOverscan(28), 58)
+})
+
+test('normalizes idle merge delay between two and ten seconds', () => {
+  assert.equal(normalizeVideoRhythmControls({ mergeDelay: 1 }).mergeDelay, 2)
+  assert.equal(normalizeVideoRhythmControls({ mergeDelay: 12 }).mergeDelay, 10)
+})
+
+test('advances idle merge one piece per merge delay', () => {
+  assert.equal(
+    getVideoRhythmIdleMergeStep({
+      lastSeekAt: 1_000,
+      now: 4_999,
+      mergeDelay: 4,
+      sourceCount: 8,
+    }),
+    0,
+  )
+  assert.equal(
+    getVideoRhythmIdleMergeStep({
+      lastSeekAt: 1_000,
+      now: 9_100,
+      mergeDelay: 4,
+      sourceCount: 8,
+    }),
+    2,
+  )
+  assert.equal(
+    getVideoRhythmIdleMergeStep({
+      lastSeekAt: 0,
+      now: 20_000,
+      mergeDelay: 4,
+      sourceCount: 8,
+    }),
+    0,
+  )
 })

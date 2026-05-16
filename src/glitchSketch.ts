@@ -15,6 +15,7 @@ import {
 import {
   DEFAULT_VIDEO_RHYTHM_CONTROLS,
   getVideoRhythmEnergy,
+  getVideoRhythmIdleMergeStep,
   getVideoRhythmPieceOverscan,
   getVideoRhythmSeekSourceCount,
   getVideoRhythmSeekTime,
@@ -170,6 +171,8 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   }
   let previousVideoRhythmEnergy = 0
   let lastVideoRhythmSeekAt = 0
+  let lastVideoRhythmMultiSeekAt = 0
+  let lastVideoRhythmMergeStep = 0
   let recorderDestination: MediaStreamAudioDestinationNode | null = null
   let recorderDestinationConnected = false
   let mediaRecorder: MediaRecorder | null = null
@@ -445,6 +448,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     )
 
     if (!shouldSeek || !Number.isFinite(video.duration) || video.duration <= 0) {
+      updateVideoRhythmIdleMerge(now)
       return
     }
 
@@ -461,6 +465,8 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     }
 
     const neededSlices = getVideoRhythmSeekSourceCount(videoRhythmControls)
+    lastVideoRhythmMultiSeekAt = now
+    lastVideoRhythmMergeStep = 0
 
     for (const [index, slice] of (
       loadedVisualSource?.sliceElements ?? []
@@ -479,6 +485,50 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     }
 
     void playVideoSlices()
+  }
+
+  const updateVideoRhythmIdleMerge = (now: number) => {
+    if (videoRhythmControls.mode !== 'multi' || lastVideoRhythmMultiSeekAt <= 0) {
+      return
+    }
+
+    const sources = (loadedVisualSource?.sliceElements ?? []).slice(
+      0,
+      getVideoRhythmSeekSourceCount(videoRhythmControls),
+    )
+    const nextMergeStep = getVideoRhythmIdleMergeStep({
+      lastSeekAt: lastVideoRhythmMultiSeekAt,
+      now,
+      mergeDelay: videoRhythmControls.mergeDelay,
+      sourceCount: sources.length,
+    })
+    let appliedMerge = false
+
+    for (
+      let step = lastVideoRhythmMergeStep + 1;
+      step <= nextMergeStep;
+      step += 1
+    ) {
+      const source = sources[step - 1]
+      const target = sources[step]
+
+      if (!source || !target) {
+        continue
+      }
+
+      try {
+        target.currentTime = source.currentTime
+        appliedMerge = true
+      } catch {
+        // Browsers can reject seeks while a video source is not ready.
+      }
+    }
+
+    lastVideoRhythmMergeStep = nextMergeStep
+
+    if (appliedMerge) {
+      void playVideoSlices()
+    }
   }
 
   audio.addEventListener('ended', pauseVisualVideo)
