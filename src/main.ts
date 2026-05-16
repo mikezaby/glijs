@@ -282,9 +282,9 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 
       <div class="settings-row media-row">
         <label class="file-field">
-          <span>Image</span>
-          <input data-image-input type="file" accept="image/*" />
-          <small data-image-name>No image</small>
+          <span>Image / video</span>
+          <input data-image-input type="file" accept="image/*,video/*" />
+          <small data-image-name>No visual media</small>
         </label>
 
         <label class="file-field">
@@ -312,7 +312,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <div class="progress__fill" data-progress></div>
       </div>
 
-      <p class="status" data-status>Load image and WAV.</p>
+      <p class="status" data-status>Load image or video and WAV.</p>
 
       <section class="control-group">
         <h2>Filter order</h2>
@@ -538,13 +538,13 @@ imageInput.addEventListener('change', async () => {
   status.textContent = 'Loading image...'
 
   try {
-    await sketch.loadImage(file)
+    await sketch.loadVisualMedia(file)
     await saveStoredMedia('image', file)
     imageName.textContent = file.name
     syncUi()
   } catch (error) {
     status.textContent =
-      error instanceof Error ? error.message : 'Image loading or saving failed.'
+      error instanceof Error ? error.message : 'Visual media loading or saving failed.'
   }
 })
 
@@ -657,7 +657,7 @@ const syncUi = () => {
 
   playButton.disabled = !snapshot.hasAudio
   playButton.textContent = snapshot.playing ? 'Pause' : 'Play'
-  recordButton.disabled = !snapshot.hasImage || !snapshot.hasAudio
+  recordButton.disabled = !snapshot.hasVisualMedia || !snapshot.hasAudio
   recordButton.textContent = snapshot.recording
     ? 'Stop & download'
     : 'Record video'
@@ -677,13 +677,13 @@ const syncUi = () => {
 
   statusOverride = null
 
-  if (!snapshot.hasImage && !snapshot.hasAudio) {
-    status.textContent = 'Load image and WAV.'
+  if (!snapshot.hasVisualMedia && !snapshot.hasAudio) {
+    status.textContent = 'Load image or video and WAV.'
     return
   }
 
-  if (!snapshot.hasImage) {
-    status.textContent = 'Image missing.'
+  if (!snapshot.hasVisualMedia) {
+    status.textContent = 'Image or video missing.'
     return
   }
 
@@ -710,7 +710,7 @@ const restoreStoredMedia = async () => {
     ])
 
     if (storedImage) {
-      await sketch.loadImage(storedImage)
+      await sketch.loadVisualMedia(storedImage)
       imageName.textContent = storedImage.name
     }
 

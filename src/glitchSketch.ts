@@ -7,6 +7,11 @@ import {
   type FilterGroupKey,
   type FilterGroupState,
 } from './filterState'
+import {
+  getVisualMediaKind,
+  isVisualVideoDrawable,
+  type VisualMediaKind,
+} from './visualMedia'
 
 export {
   DEFAULT_FILTER_GROUP_STATE,
@@ -46,7 +51,7 @@ export type BlockControls = {
 }
 
 type Snapshot = {
-  hasImage: boolean
+  hasVisualMedia: boolean
   hasAudio: boolean
   playing: boolean
   recording: boolean
@@ -68,6 +73,13 @@ type CoverBounds = {
 type AudioData = {
   frequencies: Uint8Array<ArrayBuffer> | null
   waveform: Uint8Array<ArrayBuffer> | null
+}
+
+type VisualSource = {
+  kind: VisualMediaKind
+  element: p5.Image | HTMLVideoElement
+  width: number
+  height: number
 }
 
 const EMPTY_METRICS: GlitchMetrics = {
@@ -130,9 +142,9 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   let analyser: AnalyserNode | null = null
   let frequencyData: Uint8Array<ArrayBuffer> | null = null
   let waveformData: Uint8Array<ArrayBuffer> | null = null
-  let imageFileUrl: string | null = null
+  let visualFileUrl: string | null = null
   let audioFileUrl: string | null = null
-  let loadedImage: p5.Image | null = null
+  let loadedVisualSource: VisualSource | null = null
   let canvasElement: HTMLCanvasElement | null = null
   let metrics: GlitchMetrics = { ...EMPTY_METRICS }
   let sketchInstance: p5 | null = null
@@ -171,10 +183,10 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       instance.background('#07111f')
       drawBackdrop(instance, metrics, blockControls)
 
-      if (loadedImage) {
+      if (loadedVisualSource && isVisualSourceDrawable(loadedVisualSource)) {
         drawImageLayers(
           instance,
-          loadedImage,
+          loadedVisualSource,
           metrics,
           audio.currentTime,
           blockControls,
@@ -228,26 +240,32 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     return { level, bass, treble, chaos }
   }
 
-  const loadImage = async (file: File) => {
+  const loadVisualMedia = async (file: File) => {
     if (!sketchInstance) {
       throw new Error('p5 sketch is not ready yet.')
+    }
+
+    const kind = getVisualMediaKind(file)
+
+    if (!kind) {
+      throw new Error('Select an image or video file.')
     }
 
     const nextUrl = URL.createObjectURL(file)
 
     try {
       const instance = sketchInstance
-      const image = await new Promise<p5.Image>((resolve, reject) => {
-        instance.loadImage(nextUrl, resolve, () => {
-          reject(new Error('The selected image could not be decoded.'))
-        })
-      })
+      const source =
+        kind === 'image'
+          ? await loadImageSource(instance, nextUrl)
+          : await loadVideoSource(nextUrl)
 
-      loadedImage = image
-      if (imageFileUrl) {
-        URL.revokeObjectURL(imageFileUrl)
+      stopVisualVideo()
+      loadedVisualSource = source
+      if (visualFileUrl) {
+        URL.revokeObjectURL(visualFileUrl)
       }
-      imageFileUrl = nextUrl
+      visualFileUrl = nextUrl
     } catch (error) {
       URL.revokeObjectURL(nextUrl)
       throw error
@@ -290,6 +308,63 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     metrics = { ...EMPTY_METRICS }
   }
 
+  const getVisualVideo = () => {
+    return loadedVisualSource?.kind === 'video'
+      ? (loadedVisualSource.element as HTMLVideoElement)
+      : null
+  }
+
+  const syncVisualVideoToAudio = () => {
+    const video = getVisualVideo()
+
+    if (!video) {
+      return
+    }
+
+    try {
+      video.currentTime =
+        Number.isFinite(video.duration) && video.duration > 0
+          ? audio.currentTime % video.duration
+          : 0
+    } catch {
+      // Some browsers reject seeks before the first decodable frame is ready.
+    }
+  }
+
+  const playVisualVideoFromAudio = async () => {
+    const video = getVisualVideo()
+
+    if (!video) {
+      return
+    }
+
+    syncVisualVideoToAudio()
+    video.muted = true
+    await video.play()
+  }
+
+  const pauseVisualVideo = () => {
+    getVisualVideo()?.pause()
+  }
+
+  const stopVisualVideo = () => {
+    const video = getVisualVideo()
+
+    if (!video) {
+      return
+    }
+
+    video.pause()
+
+    try {
+      video.currentTime = 0
+    } catch {
+      // Ignore reset failures while the browser is still loading metadata.
+    }
+  }
+
+  audio.addEventListener('ended', pauseVisualVideo)
+
   const togglePlayback = async () => {
     if (!audio.src) {
       throw new Error('Load a WAV file before pressing play.')
@@ -306,10 +381,12 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
         await audioContext.resume()
       }
       await audio.play()
+      await playVisualVideoFromAudio()
       return
     }
 
     audio.pause()
+    pauseVisualVideo()
   }
 
   const cleanupRecording = () => {
@@ -327,8 +404,8 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   }
 
   const startVideoRecording = async () => {
-    if (!loadedImage) {
-      throw new Error('Load an image before recording.')
+    if (!loadedVisualSource) {
+      throw new Error('Load an image or video before recording.')
     }
 
     if (!audio.src) {
@@ -419,6 +496,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     audio.currentTime = 0
     recorder.start(250)
     await audio.play()
+    await playVisualVideoFromAudio()
   }
 
   const stopVideoRecording = async (
@@ -430,6 +508,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
 
     if (pauseAudio) {
       audio.pause()
+      pauseVisualVideo()
     }
 
     mediaRecorder.stop()
@@ -437,7 +516,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   }
 
   const getSnapshot = (): Snapshot => ({
-    hasImage: Boolean(loadedImage),
+    hasVisualMedia: Boolean(loadedVisualSource),
     hasAudio: Boolean(audio.src),
     playing: !audio.paused && !audio.ended,
     recording: mediaRecorder?.state === 'recording',
@@ -481,10 +560,11 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   const dispose = () => {
     void stopVideoRecording()
     audio.pause()
+    pauseVisualVideo()
     audio.src = ''
 
-    if (imageFileUrl) {
-      URL.revokeObjectURL(imageFileUrl)
+    if (visualFileUrl) {
+      URL.revokeObjectURL(visualFileUrl)
     }
     if (audioFileUrl) {
       URL.revokeObjectURL(audioFileUrl)
@@ -498,7 +578,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   }
 
   return {
-    loadImage,
+    loadVisualMedia,
     loadAudio,
     togglePlayback,
     startVideoRecording,
@@ -509,6 +589,69 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     setFilterGroupState,
     dispose,
   }
+}
+
+const loadImageSource = (instance: p5, url: string) => {
+  return new Promise<VisualSource>((resolve, reject) => {
+    instance.loadImage(
+      url,
+      (image) => {
+        resolve({
+          kind: 'image',
+          element: image,
+          width: image.width,
+          height: image.height,
+        })
+      },
+      () => {
+        reject(new Error('The selected image could not be decoded.'))
+      },
+    )
+  })
+}
+
+const loadVideoSource = (url: string) => {
+  return new Promise<VisualSource>((resolve, reject) => {
+    const video = document.createElement('video')
+
+    video.muted = true
+    video.playsInline = true
+    video.preload = 'auto'
+    video.loop = true
+    video.src = url
+
+    const cleanup = () => {
+      video.removeEventListener('loadeddata', handleLoaded)
+      video.removeEventListener('error', handleError)
+    }
+
+    const handleLoaded = () => {
+      cleanup()
+      resolve({
+        kind: 'video',
+        element: video,
+        width: video.videoWidth,
+        height: video.videoHeight,
+      })
+    }
+
+    const handleError = () => {
+      cleanup()
+      reject(new Error('The selected video could not be decoded.'))
+    }
+
+    video.addEventListener('loadeddata', handleLoaded, { once: true })
+    video.addEventListener('error', handleError, { once: true })
+    video.load()
+  })
+}
+
+const isVisualSourceDrawable = (visualSource: VisualSource) => {
+  if (visualSource.kind === 'image') {
+    return visualSource.width > 0 && visualSource.height > 0
+  }
+
+  return isVisualVideoDrawable(visualSource.element as HTMLVideoElement)
 }
 
 const getSupportedVideoMimeType = () => {
@@ -589,14 +732,19 @@ const drawPlaceholder = (instance: p5, metrics: GlitchMetrics) => {
 
 const drawImageLayers = (
   instance: p5,
-  image: p5.Image,
+  visualSource: VisualSource,
   metrics: GlitchMetrics,
   audioTime: number,
   blockControls: BlockControls,
   filterOrder: FilterGroupKey[],
   audioData: AudioData,
 ) => {
-  const bounds = getCoverBounds(image.width, image.height, instance.width * 0.84, instance.height * 0.8)
+  const bounds = getCoverBounds(
+    visualSource.width,
+    visualSource.height,
+    instance.width * 0.84,
+    instance.height * 0.8,
+  )
   const centerX = instance.width / 2 + Math.sin(audioTime * 1.7) * metrics.bass * 14
   const centerY = instance.height / 2 + Math.cos(audioTime * 2.2) * metrics.level * 10
   const x = centerX - bounds.width / 2
@@ -604,8 +752,7 @@ const drawImageLayers = (
 
   instance.push()
   instance.blendMode(instance.BLEND)
-  instance.tint(255, 244)
-  instance.image(image, x, y, bounds.width, bounds.height)
+  drawVisualSource(instance, visualSource, x, y, bounds.width, bounds.height)
   instance.pop()
 
   for (const group of filterOrder) {
@@ -629,6 +776,28 @@ const drawImageLayers = (
         break
     }
   }
+}
+
+const drawVisualSource = (
+  instance: p5,
+  visualSource: VisualSource,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) => {
+  if (visualSource.kind === 'image') {
+    instance.tint(255, 244)
+    instance.image(visualSource.element as p5.Image, x, y, width, height)
+    return
+  }
+
+  const context = instance.drawingContext as CanvasRenderingContext2D
+
+  context.save()
+  context.globalAlpha = 244 / 255
+  context.drawImage(visualSource.element as HTMLVideoElement, x, y, width, height)
+  context.restore()
 }
 
 const drawRgbSplit = (
