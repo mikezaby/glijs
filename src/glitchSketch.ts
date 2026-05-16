@@ -15,6 +15,8 @@ import {
 import {
   DEFAULT_VIDEO_RHYTHM_CONTROLS,
   getVideoRhythmEnergy,
+  getVideoRhythmPieceOverscan,
+  getVideoRhythmSeekSourceCount,
   getVideoRhythmSeekTime,
   normalizeVideoRhythmControls,
   shouldResumeVideoSlice,
@@ -456,10 +458,12 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       return
     }
 
+    const neededSlices = getVideoRhythmSeekSourceCount(videoRhythmControls)
+
     for (const [index, slice] of (
       loadedVisualSource?.sliceElements ?? []
     ).entries()) {
-      if (index >= getNeededVideoSliceCount(videoRhythmControls)) {
+      if (index >= neededSlices) {
         slice.pause()
         continue
       }
@@ -997,7 +1001,7 @@ const drawVideoSlices = (
   const sourceHeight = visualSource.height / sliceCount
   const targetHeight = height / sliceCount
   const motion = (videoRhythmControls.motion / 100) * 28
-  const overlap = motion + 2
+  const overlap = getVideoRhythmPieceOverscan(motion)
 
   for (let index = 0; index < sliceCount; index += 1) {
     const sliceSource = sources[index % sources.length]
@@ -1039,7 +1043,7 @@ const drawVideoCubes = (
   const targetCellWidth = width / columns
   const targetCellHeight = height / rows
   const motion = (videoRhythmControls.motion / 100) * 34
-  const overlap = motion + 2
+  const overlap = getVideoRhythmPieceOverscan(motion)
 
   for (let index = 0; index < pieceCount; index += 1) {
     const column = index % columns

@@ -121,6 +121,20 @@ export const shouldResumeVideoSlice = (slice: SlicePlaybackStateLike) => {
   return slice.paused && slice.readyState >= 2
 }
 
+export const getVideoRhythmSeekSourceCount = (
+  controls: Pick<VideoRhythmControls, 'mode' | 'slices'>,
+) => {
+  if (controls.mode !== 'multi') {
+    return 1
+  }
+
+  return normalizeInteger(controls.slices, 1, 200, 6)
+}
+
+export const getVideoRhythmPieceOverscan = (motion: number) => {
+  return Math.max(2, Math.ceil(Math.max(0, motion) * 2 + 2))
+}
+
 export const normalizeVideoRhythmControls = (
   controls: Partial<VideoRhythmControls> | null | undefined,
 ): VideoRhythmControls => {

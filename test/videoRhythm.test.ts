@@ -3,6 +3,8 @@ import test from 'node:test'
 
 import {
   DEFAULT_VIDEO_RHYTHM_CONTROLS,
+  getVideoRhythmPieceOverscan,
+  getVideoRhythmSeekSourceCount,
   getVideoRhythmTriggerThreshold,
   getVideoRhythmSeekTime,
   normalizeVideoRhythmControls,
@@ -106,4 +108,19 @@ test('resumes paused video slices only after a decoded frame exists', () => {
 test('allows up to 200 video rhythm pieces', () => {
   assert.equal(normalizeVideoRhythmControls({ slices: 200 }).slices, 200)
   assert.equal(normalizeVideoRhythmControls({ slices: 240 }).slices, 200)
+})
+
+test('uses only slice videos as multi seek sources', () => {
+  assert.equal(
+    getVideoRhythmSeekSourceCount({
+      ...DEFAULT_VIDEO_RHYTHM_CONTROLS,
+      mode: 'multi',
+      slices: 6,
+    }),
+    6,
+  )
+})
+
+test('overscans moving video pieces enough to cover motion gaps', () => {
+  assert.equal(getVideoRhythmPieceOverscan(28), 58)
 })
