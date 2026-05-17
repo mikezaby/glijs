@@ -47,7 +47,7 @@ export type VideoRhythmIdleMergeStepOptions = {
 }
 
 export const DEFAULT_VIDEO_RHYTHM_CONTROLS: VideoRhythmControls = {
-  mode: 'normal',
+  mode: 'multi',
   shape: 'cubes',
   sensitivity: 55,
   bass: 75,
