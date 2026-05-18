@@ -6,6 +6,10 @@ glijs is a browser-based audiovisual glitch tool. It combines image or silent vi
 
 The project is built with Vite, TypeScript, and p5.
 
+## Project Status
+
+glijs is an experimental prototype for exploring realtime audiovisual glitch techniques. It was built through rapid creative coding iteration, including AI-assisted coding.
+
 ## What It Does
 
 - Loads an image or video as the visual source.
@@ -84,4 +88,3 @@ glijs expects a modern browser with support for:
 - Canvas rendering and `captureStream`
 - MediaRecorder
 - IndexedDB/localStorage for saved media choices
-
