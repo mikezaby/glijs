@@ -4,7 +4,7 @@
 
 glijs is a browser-based audiovisual glitch tool. It combines image or silent video input with an audio track, then uses realtime controls and audio analysis to produce rhythm-driven visual distortion.
 
-The project is built with Vite, TypeScript, and p5.
+The project is built with Vite, React, TypeScript, and p5.
 
 ## Project Status
 

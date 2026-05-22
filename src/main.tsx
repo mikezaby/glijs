@@ -1,4 +1,15 @@
 import './style.css'
+import { flushSync } from 'react-dom'
+import { createRoot, type Root } from 'react-dom/client'
+
+import {
+  App,
+  CONTROL_KEYS,
+  DEFAULT_BLOCK_CONTROLS,
+  FilterOrderItems,
+  VIDEO_RHYTHM_CONTROL_FIELDS,
+  type ControlKey,
+} from './App'
 import {
   DEFAULT_FILTER_GROUP_STATE,
   DEFAULT_FILTER_ORDER,
@@ -18,7 +29,6 @@ import {
   canRenderVideo,
   getRenderButtonLabel,
 } from './exportState'
-import { renderInfoTooltip } from './infoTooltip'
 import {
   loadStoredBlockControls,
   loadStoredFilterGroupState,
@@ -38,431 +48,12 @@ import {
   type VideoRhythmShape,
 } from './videoRhythm'
 
-const DEFAULT_BLOCK_CONTROLS: BlockControls = {
-  spread: 62,
-  density: 58,
-  size: 48,
-  noise: 0,
-  randomness: 44,
-  tearCount: 55,
-  tearHeight: 50,
-  tearShift: 65,
-  rgbAmount: 60,
-  rgbOpacity: 65,
-  rgbBalance: 50,
-  rgbDrift: 35,
-  rgbSaturation: 58,
-  rgbAudioTint: 62,
-  scanlineDensity: 55,
-  scanlineOpacity: 45,
-  streakCount: 45,
-  streakLength: 60,
-  streakOpacity: 50,
-  backdropIntensity: 60,
-}
+const appHost = document.querySelector<HTMLDivElement>('#app')!
+const appRoot = createRoot(appHost)
 
-type ControlKey = keyof BlockControls
-
-type ControlGroup = {
-  filterKey?: FilterGroupKey
-  name: string
-  controls: Array<{
-    key: ControlKey
-    label: string
-    title: string
-  }>
-}
-
-const CONTROL_GROUPS: ControlGroup[] = [
-  {
-    filterKey: 'squares',
-    name: 'Squares',
-    controls: [
-      {
-        key: 'spread',
-        label: 'Spread',
-        title: 'Low disables or centers squares. High spreads them across the canvas.',
-      },
-      {
-        key: 'density',
-        label: 'Density',
-        title: 'Controls total active square area.',
-      },
-      {
-        key: 'size',
-        label: 'Size',
-        title: 'Controls rendered square size.',
-      },
-      {
-        key: 'noise',
-        label: 'Noise',
-        title: 'Adds grain inside displaced squares.',
-      },
-      {
-        key: 'randomness',
-        label: 'Random',
-        title: 'Adds random movement on top of audio-derived positions.',
-      },
-    ],
-  },
-  {
-    filterKey: 'tears',
-    name: 'Tears',
-    controls: [
-      {
-        key: 'tearCount',
-        label: 'Count',
-        title: 'Controls how many horizontal tears are drawn.',
-      },
-      {
-        key: 'tearHeight',
-        label: 'Height',
-        title: 'Controls tear slice thickness.',
-      },
-      {
-        key: 'tearShift',
-        label: 'Shift',
-        title: 'Controls horizontal tear displacement.',
-      },
-    ],
-  },
-  {
-    filterKey: 'rgbSplit',
-    name: 'RGB Split',
-    controls: [
-      {
-        key: 'rgbAmount',
-        label: 'Amount',
-        title: 'Controls red/cyan channel offset.',
-      },
-      {
-        key: 'rgbOpacity',
-        label: 'Opacity',
-        title: 'Controls channel split visibility.',
-      },
-      {
-        key: 'rgbBalance',
-        label: 'Balance',
-        title: 'Manual bias between high-frequency red and bass-heavy cyan.',
-      },
-      {
-        key: 'rgbDrift',
-        label: 'Drift',
-        title: 'Adds audio-moving hue changes inside the split colors.',
-      },
-      {
-        key: 'rgbSaturation',
-        label: 'Saturation',
-        title: 'Controls how intense the split colors become.',
-      },
-      {
-        key: 'rgbAudioTint',
-        label: 'Audio tint',
-        title: 'Uses spectrum analysis: bass pushes cyan/blue, highs push red, mids blend violet.',
-      },
-    ],
-  },
-  {
-    filterKey: 'scanlines',
-    name: 'Scanlines',
-    controls: [
-      {
-        key: 'scanlineDensity',
-        label: 'Density',
-        title: 'Controls scanline spacing.',
-      },
-      {
-        key: 'scanlineOpacity',
-        label: 'Opacity',
-        title: 'Controls scanline visibility.',
-      },
-    ],
-  },
-  {
-    filterKey: 'streaks',
-    name: 'Streaks',
-    controls: [
-      {
-        key: 'streakCount',
-        label: 'Count',
-        title: 'Controls how many streaks are drawn.',
-      },
-      {
-        key: 'streakLength',
-        label: 'Length',
-        title: 'Controls streak width.',
-      },
-      {
-        key: 'streakOpacity',
-        label: 'Opacity',
-        title: 'Controls streak visibility.',
-      },
-    ],
-  },
-  {
-    name: 'Backdrop',
-    controls: [
-      {
-        key: 'backdropIntensity',
-        label: 'Intensity',
-        title: 'Controls background pulse and glow strength.',
-      },
-    ],
-  },
-]
-
-const CONTROL_KEYS = CONTROL_GROUPS.flatMap((group) =>
-  group.controls.map((control) => control.key),
-)
-
-const FILTER_GROUP_LABELS: Record<FilterGroupKey, string> = {
-  rgbSplit: 'RGB Split',
-  tears: 'Tears',
-  squares: 'Squares',
-  scanlines: 'Scanlines',
-  streaks: 'Streaks',
-}
-
-const VIDEO_RHYTHM_CONTROL_FIELDS: Array<{
-  key: keyof Omit<VideoRhythmControls, 'mode' | 'shape'>
-  label: string
-  title: string
-  min: number
-  max: number
-}> = [
-  {
-    key: 'sensitivity',
-    label: 'Sensitivity',
-    title: 'Controls how easily the audio triggers video seek jumps.',
-    min: 0,
-    max: 100,
-  },
-  {
-    key: 'bass',
-    label: 'Bass',
-    title: 'Controls how strongly bass energy pushes video seeking.',
-    min: 0,
-    max: 100,
-  },
-  {
-    key: 'treble',
-    label: 'Highs',
-    title: 'Controls how strongly high frequencies push video seeking.',
-    min: 0,
-    max: 100,
-  },
-  {
-    key: 'seekRange',
-    label: 'Range',
-    title: 'Controls how far from normal playback seek jumps can travel.',
-    min: 0,
-    max: 100,
-  },
-  {
-    key: 'slices',
-    label: 'Pieces',
-    title: 'Controls how many strips or cubes are drawn in multi-seek mode.',
-    min: 1,
-    max: 200,
-  },
-  {
-    key: 'motion',
-    label: 'Motion',
-    title: 'Controls how randomly strips or cubes move around the picture.',
-    min: 0,
-    max: 100,
-  },
-  {
-    key: 'mergeDelay',
-    label: 'Merge delay',
-    title: 'Controls how long quiet sections wait before older seeks cascade through the pieces.',
-    min: 0,
-    max: 10,
-  },
-]
-
-const renderControlGroup = (group: ControlGroup) => `
-  <section class="control-group" ${group.filterKey ? `data-filter-control-group="${group.filterKey}"` : ''}>
-    <div class="control-group__head">
-      <h2>${group.name}</h2>
-      ${
-        group.filterKey
-          ? `
-            <div class="filter-toggles" aria-label="${group.name} filter controls">
-              <label class="toggle-field">
-                <input
-                  data-filter-enabled="${group.filterKey}"
-                  type="checkbox"
-                  checked
-                />
-                <span>Enable</span>
-              </label>
-              <label class="toggle-field toggle-field--solo">
-                <input data-filter-solo="${group.filterKey}" type="checkbox" />
-                <span>Solo</span>
-              </label>
-            </div>
-          `
-          : ''
-      }
-    </div>
-    <div class="settings-row slider-row">
-      ${group.controls
-        .map(
-          (control) => `
-            <label class="slider-field" title="${control.title}">
-              <div class="slider-field__head">
-                <span class="field-label">
-                  ${control.label}
-                  ${renderInfoTooltip(control.title)}
-                </span>
-                <strong data-control-value="${control.key}">
-                  ${DEFAULT_BLOCK_CONTROLS[control.key]}%
-                </strong>
-              </div>
-              <input
-                data-control-slider="${control.key}"
-                type="range"
-                min="0"
-                max="100"
-                value="${DEFAULT_BLOCK_CONTROLS[control.key]}"
-              />
-            </label>
-          `,
-        )
-        .join('')}
-    </div>
-  </section>
-`
-
-const renderVideoRhythmControls = () => `
-  <section class="control-group">
-    <div class="control-group__head">
-      <h2>Video rhythm</h2>
-    </div>
-    <label class="select-field" title="Controls how video time reacts to the WAV analysis.">
-      <span class="field-label">
-        Mode
-        ${renderInfoTooltip('Controls how video time reacts to the WAV analysis.')}
-      </span>
-      <select data-video-rhythm-mode>
-        <option value="normal">Normal playback</option>
-        <option value="seek">Rhythm seek</option>
-        <option value="multi">Multi-seek slices</option>
-      </select>
-    </label>
-    <label class="select-field" title="Controls the visual structure used by multi-seek mode.">
-      <span class="field-label">
-        Shape
-        ${renderInfoTooltip('Controls the visual structure used by multi-seek mode.')}
-      </span>
-      <select data-video-rhythm-shape>
-        <option value="strips">Strips</option>
-        <option value="cubes">Cubes</option>
-      </select>
-    </label>
-    <div class="settings-row slider-row">
-      ${VIDEO_RHYTHM_CONTROL_FIELDS.map(
-        (control) => `
-          <label class="slider-field" title="${control.title}">
-            <div class="slider-field__head">
-              <span class="field-label">
-                ${control.label}
-                ${renderInfoTooltip(control.title)}
-              </span>
-              <strong data-video-rhythm-value="${control.key}">
-                ${DEFAULT_VIDEO_RHYTHM_CONTROLS[control.key]}
-              </strong>
-            </div>
-            <input
-              data-video-rhythm-slider="${control.key}"
-              type="range"
-              min="${control.min}"
-              max="${control.max}"
-              value="${DEFAULT_VIDEO_RHYTHM_CONTROLS[control.key]}"
-            />
-          </label>
-        `,
-      ).join('')}
-    </div>
-  </section>
-`
-
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <main class="shell">
-    <button
-      data-settings-toggle
-      class="settings-toggle is-open"
-      type="button"
-      aria-expanded="true"
-      aria-controls="settings-panel"
-      aria-label="Hide settings"
-    >
-      <span class="settings-toggle__grip" aria-hidden="true"></span>
-    </button>
-
-    <section class="stage">
-      <div id="sketch-host" class="sketch-host"></div>
-    </section>
-
-    <aside id="settings-panel" class="settings is-open" aria-label="Visual settings">
-      <div class="settings__header">
-        <span>Settings</span>
-        <button data-settings-close class="settings__close" type="button" aria-label="Hide settings">
-          Close
-        </button>
-      </div>
-
-      <div class="settings-row media-row">
-        <label class="file-field">
-          <span>Image / video</span>
-          <input data-image-input type="file" accept="image/*,video/*" />
-          <small data-image-name>No visual media</small>
-        </label>
-
-        <label class="file-field">
-          <span>WAV</span>
-          <input data-audio-input type="file" accept=".wav,audio/wav" />
-          <small data-audio-name>No audio</small>
-        </label>
-
-        <div class="transport">
-          <button data-play type="button" class="transport__button" disabled>
-            Play
-          </button>
-          <button data-record-video type="button" class="transport__button transport__button--secondary" disabled>
-            Record video
-          </button>
-          <button data-render-video type="button" class="transport__button transport__button--secondary" disabled>
-            Render & download
-          </button>
-          <div class="transport__time">
-            <span data-current-time>00:00</span>
-            <span>/</span>
-            <span data-duration>00:00</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="progress" aria-hidden="true">
-        <div class="progress__fill" data-progress></div>
-      </div>
-
-      <p class="status" data-status>Load image or video and WAV.</p>
-
-      ${renderVideoRhythmControls()}
-
-      <section class="control-group">
-        <h2>Filter order</h2>
-        <div class="filter-order" data-filter-order-list></div>
-      </section>
-
-      <div class="control-groups">
-        ${CONTROL_GROUPS.map(renderControlGroup).join('')}
-      </div>
-    </aside>
-  </main>
-`
+flushSync(() => {
+  appRoot.render(<App />)
+})
 
 const settingsPanel = document.querySelector<HTMLElement>('#settings-panel')!
 const settingsToggle = document.querySelector<HTMLButtonElement>(
@@ -490,6 +81,7 @@ const sketchHost = document.querySelector<HTMLElement>('#sketch-host')!
 const filterOrderList = document.querySelector<HTMLElement>(
   '[data-filter-order-list]',
 )!
+const filterOrderRoot: Root = createRoot(filterOrderList)
 const videoRhythmMode = document.querySelector<HTMLSelectElement>(
   '[data-video-rhythm-mode]',
 )!
@@ -594,35 +186,9 @@ const sketch = await createGlitchSketch({
 })
 
 const renderFilterOrder = () => {
-  filterOrderList.innerHTML = filterOrder
-    .map(
-      (key, index) => `
-        <div class="filter-order__item" data-filter-order-item="${key}">
-          <span>${index + 1}. ${FILTER_GROUP_LABELS[key]}</span>
-          <div class="filter-order__actions">
-            <button
-              type="button"
-              data-filter-move="${key}"
-              data-filter-direction="up"
-              ${index === 0 ? 'disabled' : ''}
-              aria-label="Move ${FILTER_GROUP_LABELS[key]} earlier"
-            >
-              Up
-            </button>
-            <button
-              type="button"
-              data-filter-move="${key}"
-              data-filter-direction="down"
-              ${index === filterOrder.length - 1 ? 'disabled' : ''}
-              aria-label="Move ${FILTER_GROUP_LABELS[key]} later"
-            >
-              Down
-            </button>
-          </div>
-        </div>
-      `,
-    )
-    .join('')
+  flushSync(() => {
+    filterOrderRoot.render(<FilterOrderItems filterOrder={filterOrder} />)
+  })
 }
 
 const applyFilterOrder = (nextOrder: FilterGroupKey[]) => {
