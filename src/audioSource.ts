@@ -17,3 +17,14 @@ export const getAudioMonitorGain = (mode: AudioSourceMode) => {
 export const isWavFileInputVisible = (mode: AudioSourceMode) => {
   return mode === 'wav'
 }
+
+export const createAudioInputConstraints = (
+  deviceId?: string,
+): MediaStreamConstraints => ({
+  audio: {
+    ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false,
+  },
+})

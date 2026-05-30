@@ -1,5 +1,9 @@
 import type p5 from 'p5'
-import { getAudioMonitorGain, type AudioSourceMode } from './audioSource'
+import {
+  createAudioInputConstraints,
+  getAudioMonitorGain,
+  type AudioSourceMode,
+} from './audioSource'
 import {
   DEFAULT_FILTER_GROUP_STATE,
   DEFAULT_FILTER_ORDER,
@@ -499,9 +503,9 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       await audioContext.resume()
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: deviceId ? { deviceId: { exact: deviceId } } : true,
-    })
+    const stream = await navigator.mediaDevices.getUserMedia(
+      createAudioInputConstraints(deviceId),
+    )
 
     audio.pause()
     disconnectFileSource()
