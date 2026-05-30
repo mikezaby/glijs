@@ -1,4 +1,5 @@
 import type p5 from 'p5'
+import { getAudioMonitorGain, type AudioSourceMode } from './audioSource'
 import {
   DEFAULT_FILTER_GROUP_STATE,
   DEFAULT_FILTER_ORDER,
@@ -64,6 +65,7 @@ export type BlockControls = {
 }
 
 type Snapshot = {
+  audioSourceMode: AudioSourceMode
   hasVisualMedia: boolean
   hasAudio: boolean
   playing: boolean
@@ -153,8 +155,17 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   const audio = new Audio()
   audio.preload = 'metadata'
 
+  let audioSourceMode: AudioSourceMode = 'wav'
   let audioContext: AudioContext | null = null
-  let sourceNode: MediaElementAudioSourceNode | null = null
+  let fileSourceNode: MediaElementAudioSourceNode | null = null
+  let fileSourceConnected = false
+  let inputStream: MediaStream | null = null
+  let inputSourceNode: MediaStreamAudioSourceNode | null = null
+  let inputSourceConnected = false
+  let monitorGainNode: GainNode | null = null
+  let liveInputPlaying = false
+  let liveInputStartedAt = 0
+  let liveInputElapsed = 0
   let analyser: AnalyserNode | null = null
   let frequencyData: Uint8Array<ArrayBuffer> | null = null
   let waveformData: Uint8Array<ArrayBuffer> | null = null
@@ -203,17 +214,18 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     instance.draw = () => {
       resizeIfNeeded(instance, options.host)
       metrics = readMetrics()
+      const audioTime = getAudioTime()
 
       instance.background('#07111f')
       drawBackdrop(instance, metrics, blockControls)
 
       if (loadedVisualSource && isVisualSourceDrawable(loadedVisualSource)) {
-        updateVideoRhythm(metrics, audio.currentTime, Date.now())
+        updateVideoRhythm(metrics, audioTime, Date.now())
         drawImageLayers(
           instance,
           loadedVisualSource,
           metrics,
-          audio.currentTime,
+          audioTime,
           videoRhythmControls,
           blockControls,
           resolveActiveFilterOrder(filterOrder, filterGroupState),
@@ -235,19 +247,145 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   new P5(sketch)
 
   const ensureAudioGraph = () => {
-    if (audioContext && analyser && frequencyData && waveformData) {
+    if (!audioContext) {
+      audioContext = new AudioContext()
+    }
+
+    if (!analyser) {
+      analyser = audioContext.createAnalyser()
+      analyser.fftSize = 512
+      analyser.smoothingTimeConstant = 0.82
+      frequencyData = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount))
+      waveformData = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount))
+      monitorGainNode = audioContext.createGain()
+      monitorGainNode.gain.value = getAudioMonitorGain(audioSourceMode)
+      analyser.connect(monitorGainNode)
+      monitorGainNode.connect(audioContext.destination)
+    }
+  }
+
+  const updateAudioMonitorGain = () => {
+    if (!audioContext || !monitorGainNode) {
       return
     }
 
-    audioContext = new AudioContext()
-    analyser = audioContext.createAnalyser()
-    analyser.fftSize = 512
-    analyser.smoothingTimeConstant = 0.82
-    frequencyData = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount))
-    waveformData = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount))
-    sourceNode = audioContext.createMediaElementSource(audio)
-    sourceNode.connect(analyser)
-    analyser.connect(audioContext.destination)
+    monitorGainNode.gain.setValueAtTime(
+      getAudioMonitorGain(audioSourceMode),
+      audioContext.currentTime,
+    )
+  }
+
+  const connectFileSource = () => {
+    ensureAudioGraph()
+
+    if (!audioContext || !analyser) {
+      throw new Error('Audio graph is unavailable.')
+    }
+
+    if (!fileSourceNode) {
+      fileSourceNode = audioContext.createMediaElementSource(audio)
+    }
+
+    if (!fileSourceConnected) {
+      fileSourceNode.connect(analyser)
+      fileSourceConnected = true
+    }
+  }
+
+  const disconnectFileSource = () => {
+    if (!fileSourceNode || !fileSourceConnected) {
+      return
+    }
+
+    fileSourceNode.disconnect()
+    fileSourceConnected = false
+  }
+
+  const connectInputSource = () => {
+    ensureAudioGraph()
+
+    if (!inputSourceNode || !analyser) {
+      throw new Error('Audio input is unavailable.')
+    }
+
+    if (!inputSourceConnected) {
+      inputSourceNode.connect(analyser)
+      inputSourceConnected = true
+    }
+  }
+
+  const disconnectInputSource = () => {
+    if (!inputSourceNode || !inputSourceConnected) {
+      return
+    }
+
+    inputSourceNode.disconnect()
+    inputSourceConnected = false
+  }
+
+  const stopInputStream = () => {
+    disconnectInputSource()
+    inputStream?.getTracks().forEach((track) => {
+      track.stop()
+    })
+    inputStream = null
+    inputSourceNode = null
+    liveInputPlaying = false
+    liveInputStartedAt = 0
+    liveInputElapsed = 0
+  }
+
+  const getAudioTime = () => {
+    if (audioSourceMode !== 'input') {
+      return audio.currentTime
+    }
+
+    if (!liveInputPlaying || !audioContext) {
+      return liveInputElapsed
+    }
+
+    return liveInputElapsed + Math.max(0, audioContext.currentTime - liveInputStartedAt)
+  }
+
+  const hasAudioSource = () => {
+    return audioSourceMode === 'input' ? Boolean(inputStream) : Boolean(audio.src)
+  }
+
+  const isAudioSourcePlaying = () => {
+    return audioSourceMode === 'input'
+      ? liveInputPlaying
+      : !audio.paused && !audio.ended
+  }
+
+  const pauseLiveInput = () => {
+    if (!liveInputPlaying) {
+      return
+    }
+
+    liveInputElapsed = getAudioTime()
+    liveInputPlaying = false
+    liveInputStartedAt = 0
+    disconnectInputSource()
+  }
+
+  const playLiveInput = async () => {
+    if (!inputStream) {
+      throw new Error('Connect an audio input before pressing play.')
+    }
+
+    ensureAudioGraph()
+
+    if (!audioContext) {
+      throw new Error('Audio context is unavailable.')
+    }
+
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume()
+    }
+
+    connectInputSource()
+    liveInputStartedAt = audioContext.currentTime
+    liveInputPlaying = true
   }
 
   const readMetrics = (): GlitchMetrics => {
@@ -299,7 +437,15 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   }
 
   const loadAudio = async (file: File) => {
-    ensureAudioGraph()
+    if (mediaRecorder?.state === 'recording') {
+      throw new Error('Stop recording before changing audio source.')
+    }
+
+    audioSourceMode = 'wav'
+    updateAudioMonitorGain()
+    pauseVisualVideo()
+    stopInputStream()
+    connectFileSource()
 
     const nextUrl = URL.createObjectURL(file)
 
@@ -334,6 +480,76 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     metrics = { ...EMPTY_METRICS }
   }
 
+  const loadAudioInput = async (deviceId?: string) => {
+    if (mediaRecorder?.state === 'recording') {
+      throw new Error('Stop recording before changing audio source.')
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('Audio input is not supported in this browser.')
+    }
+
+    ensureAudioGraph()
+
+    if (!audioContext) {
+      throw new Error('Audio context is unavailable.')
+    }
+
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume()
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+    })
+
+    audio.pause()
+    disconnectFileSource()
+    stopInputStream()
+
+    audioSourceMode = 'input'
+    updateAudioMonitorGain()
+    inputStream = stream
+    inputSourceNode = audioContext.createMediaStreamSource(stream)
+    liveInputElapsed = 0
+    connectInputSource()
+    liveInputStartedAt = audioContext.currentTime
+    liveInputPlaying = true
+    metrics = { ...EMPTY_METRICS }
+
+    await playVisualVideoFromAudio()
+  }
+
+  const setAudioSourceMode = (mode: AudioSourceMode) => {
+    if (mediaRecorder?.state === 'recording') {
+      throw new Error('Stop recording before changing audio source.')
+    }
+
+    if (mode === audioSourceMode) {
+      return
+    }
+
+    pauseVisualVideo()
+
+    if (mode === 'wav') {
+      pauseLiveInput()
+      stopInputStream()
+      audioSourceMode = 'wav'
+      updateAudioMonitorGain()
+
+      if (audio.src) {
+        connectFileSource()
+      }
+      return
+    }
+
+    audio.pause()
+    disconnectFileSource()
+    audioSourceMode = 'input'
+    updateAudioMonitorGain()
+    metrics = { ...EMPTY_METRICS }
+  }
+
   const getVisualVideo = () => {
     return loadedVisualSource?.kind === 'video'
       ? (loadedVisualSource.element as HTMLVideoElement)
@@ -350,7 +566,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     try {
       video.currentTime =
         Number.isFinite(video.duration) && video.duration > 0
-          ? audio.currentTime % video.duration
+          ? getAudioTime() % video.duration
           : 0
     } catch {
       // Some browsers reject seeks before the first decodable frame is ready.
@@ -427,7 +643,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   ) => {
     const video = getVisualVideo()
 
-    if (!video || audio.paused || audio.ended || videoRhythmControls.mode === 'normal') {
+    if (!video || !isAudioSourcePlaying() || videoRhythmControls.mode === 'normal') {
       previousVideoRhythmEnergy = getVideoRhythmEnergy(
         nextMetrics,
         videoRhythmControls,
@@ -535,11 +751,27 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   audio.addEventListener('ended', pauseVisualVideo)
 
   const togglePlayback = async () => {
-    if (!audio.src) {
-      throw new Error('Load a WAV file before pressing play.')
+    if (!hasAudioSource()) {
+      throw new Error(
+        audioSourceMode === 'input'
+          ? 'Connect an audio input before pressing play.'
+          : 'Load a WAV file before pressing play.',
+      )
     }
 
-    ensureAudioGraph()
+    if (audioSourceMode === 'input') {
+      if (liveInputPlaying) {
+        pauseLiveInput()
+        pauseVisualVideo()
+        return
+      }
+
+      await playLiveInput()
+      await playVisualVideoFromAudio()
+      return
+    }
+
+    connectFileSource()
 
     if (!audioContext) {
       throw new Error('Audio context is unavailable.')
@@ -577,8 +809,12 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       throw new Error('Load an image or video before recording.')
     }
 
-    if (!audio.src) {
-      throw new Error('Load a WAV file before recording.')
+    if (!hasAudioSource()) {
+      throw new Error(
+        audioSourceMode === 'input'
+          ? 'Connect an audio input before recording.'
+          : 'Load a WAV file before recording.',
+      )
     }
 
     if (!canvasElement?.captureStream || typeof MediaRecorder === 'undefined') {
@@ -589,7 +825,11 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       return
     }
 
-    ensureAudioGraph()
+    if (audioSourceMode === 'wav') {
+      connectFileSource()
+    } else {
+      connectInputSource()
+    }
 
     if (!audioContext || !analyser) {
       throw new Error('Audio graph is unavailable.')
@@ -656,19 +896,31 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       stopRecordingPromise = null
     })
 
-    handleRecordingAudioEnded = () => {
-      void stopVideoRecording({ pauseAudio: false })
-    }
-    audio.addEventListener('ended', handleRecordingAudioEnded, { once: true })
-
-    audio.pause()
-    audio.currentTime = 0
     recorder.start(250)
-    await audio.play()
+
+    if (audioSourceMode === 'wav') {
+      handleRecordingAudioEnded = () => {
+        void stopVideoRecording({ pauseAudio: false })
+      }
+      audio.addEventListener('ended', handleRecordingAudioEnded, { once: true })
+
+      audio.pause()
+      audio.currentTime = 0
+      await audio.play()
+    } else {
+      liveInputElapsed = getAudioTime()
+      liveInputStartedAt = audioContext.currentTime
+      liveInputPlaying = true
+    }
+
     await playVisualVideoFromAudio()
   }
 
   const renderVideoRecording = async () => {
+    if (audioSourceMode === 'input') {
+      throw new Error('Render & download uses WAV files. Record live input manually.')
+    }
+
     if (renderingVideo || mediaRecorder?.state === 'recording') {
       return
     }
@@ -691,7 +943,11 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     }
 
     if (pauseAudio) {
-      audio.pause()
+      if (audioSourceMode === 'input') {
+        pauseLiveInput()
+      } else {
+        audio.pause()
+      }
       pauseVisualVideo()
     }
 
@@ -700,13 +956,17 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   }
 
   const getSnapshot = (): Snapshot => ({
+    audioSourceMode,
     hasVisualMedia: Boolean(loadedVisualSource),
-    hasAudio: Boolean(audio.src),
-    playing: !audio.paused && !audio.ended,
+    hasAudio: hasAudioSource(),
+    playing: isAudioSourcePlaying(),
     recording: mediaRecorder?.state === 'recording',
     rendering: renderingVideo,
-    currentTime: audio.currentTime,
-    duration: Number.isFinite(audio.duration) ? audio.duration : 0,
+    currentTime: getAudioTime(),
+    duration:
+      audioSourceMode === 'wav' && Number.isFinite(audio.duration)
+        ? audio.duration
+        : 0,
   })
 
   const setBlockControls = (nextControls: BlockControls) => {
@@ -749,6 +1009,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   const dispose = () => {
     void stopVideoRecording()
     audio.pause()
+    stopInputStream()
     pauseVisualVideo()
     audio.src = ''
 
@@ -759,8 +1020,9 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       URL.revokeObjectURL(audioFileUrl)
     }
 
-    sourceNode?.disconnect()
+    fileSourceNode?.disconnect()
     analyser?.disconnect()
+    monitorGainNode?.disconnect()
     recorderDestination?.disconnect()
     sketchInstance?.remove()
     void audioContext?.close()
@@ -769,6 +1031,8 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
   return {
     loadVisualMedia,
     loadAudio,
+    loadAudioInput,
+    setAudioSourceMode,
     togglePlayback,
     startVideoRecording,
     stopVideoRecording,

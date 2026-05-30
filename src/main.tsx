@@ -11,6 +11,12 @@ import {
   type ControlKey,
 } from './App'
 import {
+  getAudioMissingStatus,
+  normalizeAudioSourceMode,
+  isWavFileInputVisible,
+  type AudioSourceMode,
+} from './audioSource'
+import {
   DEFAULT_FILTER_GROUP_STATE,
   DEFAULT_FILTER_ORDER,
   createGlitchSketch,
@@ -31,10 +37,12 @@ import {
 } from './exportState'
 import {
   loadStoredBlockControls,
+  loadStoredAudioSourceMode,
   loadStoredFilterGroupState,
   loadStoredFilterOrder,
   loadStoredMedia,
   loadStoredVideoRhythmControls,
+  saveStoredAudioSourceMode,
   saveStoredBlockControls,
   saveStoredFilterGroupState,
   saveStoredFilterOrder,
@@ -63,7 +71,18 @@ const settingsClose = document.querySelector<HTMLButtonElement>(
   '[data-settings-close]',
 )!
 const imageInput = document.querySelector<HTMLInputElement>('[data-image-input]')!
+const audioSource = document.querySelector<HTMLSelectElement>('[data-audio-source]')!
+const audioFileField = document.querySelector<HTMLElement>(
+  '[data-audio-file-field]',
+)!
 const audioInput = document.querySelector<HTMLInputElement>('[data-audio-input]')!
+const audioDevice = document.querySelector<HTMLSelectElement>('[data-audio-device]')!
+const audioInputConnect = document.querySelector<HTMLButtonElement>(
+  '[data-audio-input-connect]',
+)!
+const audioInputControls = document.querySelector<HTMLElement>(
+  '[data-audio-input-controls]',
+)!
 const playButton = document.querySelector<HTMLButtonElement>('[data-play]')!
 const recordButton = document.querySelector<HTMLButtonElement>(
   '[data-record-video]',
@@ -74,6 +93,9 @@ const renderButton = document.querySelector<HTMLButtonElement>(
 const status = document.querySelector<HTMLElement>('[data-status]')!
 const imageName = document.querySelector<HTMLElement>('[data-image-name]')!
 const audioName = document.querySelector<HTMLElement>('[data-audio-name]')!
+const audioInputName = document.querySelector<HTMLElement>(
+  '[data-audio-input-name]',
+)!
 const currentTime = document.querySelector<HTMLElement>('[data-current-time]')!
 const duration = document.querySelector<HTMLElement>('[data-duration]')!
 const progress = document.querySelector<HTMLElement>('[data-progress]')!
@@ -178,6 +200,44 @@ const downloadRecording = (recording: Blob) => {
     URL.revokeObjectURL(url)
   }, 30_000)
   setStatusOverride('Video downloaded.', 3500)
+}
+
+const getSelectedAudioSourceMode = (): AudioSourceMode => {
+  return normalizeAudioSourceMode(audioSource.value)
+}
+
+const refreshAudioInputDevices = async () => {
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    audioDevice.replaceChildren(new Option('Default input', ''))
+    return
+  }
+
+  const selectedDeviceId = audioDevice.value
+  const devices = await navigator.mediaDevices.enumerateDevices()
+  const audioInputs = devices.filter((device) => device.kind === 'audioinput')
+  const options = [
+    new Option('Default input', ''),
+    ...audioInputs.map((device, index) => {
+      return new Option(device.label || `Audio input ${index + 1}`, device.deviceId)
+    }),
+  ]
+
+  audioDevice.replaceChildren(...options)
+
+  if (audioInputs.some((device) => device.deviceId === selectedDeviceId)) {
+    audioDevice.value = selectedDeviceId
+  }
+}
+
+const syncAudioSourceControls = (mode = getSelectedAudioSourceMode()) => {
+  const inputSupported = Boolean(navigator.mediaDevices?.getUserMedia)
+
+  audioSource.value = mode
+  audioInput.disabled = mode !== 'wav'
+  audioFileField.classList.toggle('is-hidden', !isWavFileInputVisible(mode))
+  audioDevice.disabled = mode !== 'input' || !inputSupported
+  audioInputConnect.disabled = mode !== 'input' || !inputSupported
+  audioInputControls.classList.toggle('is-visible', mode === 'input')
 }
 
 const sketch = await createGlitchSketch({
@@ -326,12 +386,57 @@ audioInput.addEventListener('change', async () => {
 
   try {
     await sketch.loadAudio(file)
+    audioSource.value = 'wav'
+    syncAudioSourceControls('wav')
+    saveStoredAudioSourceMode('wav')
     await saveStoredMedia('audio', file)
     audioName.textContent = file.name
     syncUi()
   } catch (error) {
     status.textContent =
       error instanceof Error ? error.message : 'Audio loading or saving failed.'
+  }
+})
+
+audioSource.addEventListener('change', async () => {
+  const mode = getSelectedAudioSourceMode()
+
+  try {
+    sketch.setAudioSourceMode(mode)
+    syncAudioSourceControls(mode)
+    saveStoredAudioSourceMode(mode)
+
+    if (mode === 'input') {
+      await refreshAudioInputDevices()
+      status.textContent = 'Choose an audio input.'
+    }
+
+    syncUi()
+  } catch (error) {
+    audioSource.value = sketch.getSnapshot().audioSourceMode
+    syncAudioSourceControls(sketch.getSnapshot().audioSourceMode)
+    status.textContent =
+      error instanceof Error ? error.message : 'Audio source change failed.'
+  }
+})
+
+audioInputConnect.addEventListener('click', async () => {
+  status.textContent = 'Connecting audio input...'
+
+  try {
+    await sketch.loadAudioInput(audioDevice.value || undefined)
+    audioSource.value = 'input'
+    syncAudioSourceControls('input')
+    saveStoredAudioSourceMode('input')
+    await refreshAudioInputDevices()
+
+    const selectedOption = audioDevice.selectedOptions[0]
+    audioInputName.textContent =
+      selectedOption?.textContent?.trim() || 'Default input'
+    syncUi()
+  } catch (error) {
+    status.textContent =
+      error instanceof Error ? error.message : 'Audio input connection failed.'
   }
 })
 
@@ -462,6 +567,7 @@ const syncUi = () => {
   currentTime.textContent = formatTime(snapshot.currentTime)
   duration.textContent = formatTime(snapshot.duration)
   progress.style.width = `${Math.min(100, Math.max(0, progressRatio * 100))}%`
+  syncAudioSourceControls(snapshot.audioSourceMode)
 
   if (snapshot.rendering) {
     status.textContent = 'Rendering video for download...'
@@ -481,7 +587,7 @@ const syncUi = () => {
   statusOverride = null
 
   if (!snapshot.hasVisualMedia && !snapshot.hasAudio) {
-    status.textContent = 'Load image or video and WAV.'
+    status.textContent = 'Load image or video and WAV or audio input.'
     return
   }
 
@@ -491,7 +597,7 @@ const syncUi = () => {
   }
 
   if (!snapshot.hasAudio) {
-    status.textContent = 'WAV missing.'
+    status.textContent = getAudioMissingStatus(snapshot.audioSourceMode)
     return
   }
 
@@ -505,6 +611,7 @@ const animateUi = () => {
 
 const restoreStoredMedia = async () => {
   status.textContent = 'Loading demo media...'
+  const storedAudioSourceMode = loadStoredAudioSourceMode() ?? 'wav'
 
   try {
     const [storedImage, storedAudio] = await Promise.all([
@@ -523,6 +630,10 @@ const restoreStoredMedia = async () => {
 
     await sketch.loadAudio(audioFile)
     audioName.textContent = storedAudio ? audioFile.name : `Demo: ${audioFile.name}`
+
+    sketch.setAudioSourceMode(storedAudioSourceMode)
+    audioSource.value = storedAudioSourceMode
+    syncAudioSourceControls(storedAudioSourceMode)
   } catch (error) {
     status.textContent =
       error instanceof Error ? error.message : 'Default media could not be loaded.'
@@ -537,10 +648,16 @@ applyFilterGroupState(loadStoredFilterGroupState() ?? DEFAULT_FILTER_GROUP_STATE
 applyVideoRhythmControls(
   loadStoredVideoRhythmControls() ?? DEFAULT_VIDEO_RHYTHM_CONTROLS,
 )
+syncAudioSourceControls(loadStoredAudioSourceMode() ?? 'wav')
+void refreshAudioInputDevices()
 syncBlockControls()
 syncUi()
 void restoreStoredMedia()
 animateUi()
+
+navigator.mediaDevices?.addEventListener('devicechange', () => {
+  void refreshAudioInputDevices()
+})
 
 window.addEventListener('beforeunload', () => {
   sketch.dispose()

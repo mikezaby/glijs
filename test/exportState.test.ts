@@ -14,6 +14,7 @@ test('allows unattended render only when media is loaded and no export is active
       hasVisualMedia: true,
       recording: false,
       rendering: false,
+      audioSourceMode: 'wav',
     }),
     true,
   )
@@ -23,6 +24,17 @@ test('allows unattended render only when media is loaded and no export is active
       hasVisualMedia: true,
       recording: true,
       rendering: false,
+      audioSourceMode: 'wav',
+    }),
+    false,
+  )
+  assert.equal(
+    canRenderVideo({
+      hasAudio: true,
+      hasVisualMedia: true,
+      recording: false,
+      rendering: false,
+      audioSourceMode: 'input',
     }),
     false,
   )
@@ -35,6 +47,7 @@ test('blocks manual recording while unattended render is active', () => {
       hasVisualMedia: true,
       recording: true,
       rendering: true,
+      audioSourceMode: 'input',
     }),
     false,
   )

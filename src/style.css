@@ -279,6 +279,7 @@ input {
 }
 
 .file-field > span,
+.select-field > span,
 .field-label {
   display: inline-flex;
   position: relative;
@@ -373,6 +374,27 @@ input {
   padding: 9px;
   background: var(--panel);
   color: var(--text);
+}
+
+.input-source-field {
+  display: none;
+  gap: 8px;
+}
+
+.file-field.is-hidden {
+  display: none;
+}
+
+.input-source-field.is-visible {
+  display: grid;
+}
+
+.input-source-field small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .transport {

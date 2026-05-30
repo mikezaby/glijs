@@ -1,4 +1,7 @@
+import type { AudioSourceMode } from './audioSource'
+
 export type ExportSnapshot = {
+  audioSourceMode: AudioSourceMode
   hasAudio: boolean
   hasVisualMedia: boolean
   recording: boolean
@@ -7,6 +10,7 @@ export type ExportSnapshot = {
 
 export const canRenderVideo = (snapshot: ExportSnapshot) => {
   return (
+    snapshot.audioSourceMode === 'wav' &&
     snapshot.hasAudio &&
     snapshot.hasVisualMedia &&
     !snapshot.recording &&

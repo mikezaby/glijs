@@ -448,11 +448,39 @@ export const App = () => (
           <small data-image-name>No visual media</small>
         </label>
 
-        <label className="file-field">
+        <label
+          className="select-field"
+          title="Select whether the visuals react to a WAV file or a live OS audio input."
+        >
+          <span>Audio source</span>
+          <select data-audio-source defaultValue="wav">
+            <option value="wav">WAV file</option>
+            <option value="input">Audio input</option>
+          </select>
+        </label>
+
+        <label className="file-field" data-audio-file-field>
           <span>WAV</span>
           <input data-audio-input type="file" accept=".wav,audio/wav" />
           <small data-audio-name>No audio</small>
         </label>
+
+        <div className="input-source-field" data-audio-input-controls>
+          <label className="select-field">
+            <span>Input device</span>
+            <select data-audio-device>
+              <option value="">Default input</option>
+            </select>
+          </label>
+          <button
+            data-audio-input-connect
+            type="button"
+            className="transport__button transport__button--secondary"
+          >
+            Use input
+          </button>
+          <small data-audio-input-name>No input connected</small>
+        </div>
 
         <div className="transport">
           <button data-play type="button" className="transport__button" disabled>

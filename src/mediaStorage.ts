@@ -1,3 +1,7 @@
+import {
+  normalizeAudioSourceMode,
+  type AudioSourceMode,
+} from './audioSource'
 import type { BlockControls } from './glitchSketch'
 import {
   normalizeFilterGroupState,
@@ -32,6 +36,7 @@ const BLOCK_CONTROLS_KEY = 'glijs:block-controls'
 const FILTER_ORDER_KEY = 'glijs:filter-order'
 const FILTER_GROUP_STATE_KEY = 'glijs:filter-group-state'
 const VIDEO_RHYTHM_CONTROLS_KEY = 'glijs:video-rhythm-controls'
+const AUDIO_SOURCE_MODE_KEY = 'glijs:audio-source-mode'
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -172,6 +177,20 @@ export function loadStoredVideoRhythmControls(): VideoRhythmControls | null {
     localStorage.removeItem(VIDEO_RHYTHM_CONTROLS_KEY)
     return null
   }
+}
+
+export function saveStoredAudioSourceMode(mode: AudioSourceMode) {
+  localStorage.setItem(AUDIO_SOURCE_MODE_KEY, mode)
+}
+
+export function loadStoredAudioSourceMode(): AudioSourceMode | null {
+  const rawMode = localStorage.getItem(AUDIO_SOURCE_MODE_KEY)
+
+  if (!rawMode) {
+    return null
+  }
+
+  return normalizeAudioSourceMode(rawMode)
 }
 
 const openMediaDb = () => {
