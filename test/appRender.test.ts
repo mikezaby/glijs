@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import {
   App,
+  CONTROL_GROUPS,
   DEFAULT_FILTER_ORDER,
   FilterOrderItems,
   InfoTooltip,
@@ -28,6 +29,37 @@ test('renders the application shell and controls through React components', () =
   assert.match(markup, /data-control-slider="spread"/)
   assert.match(markup, /data-filter-enabled="rgbSplit"/)
   assert.match(markup, /data-filter-order-list="true"/)
+})
+
+test('renders bottom settings tabs with one panel for every effect', () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(App),
+  )
+
+  assert.match(markup, /data-settings-tabs="true"[^>]*role="tablist"/)
+  assert.match(
+    markup,
+    /data-settings-tab="squares"[^>]*role="tab"[^>]*aria-selected="true"/,
+  )
+
+  for (const group of CONTROL_GROUPS) {
+    const tabKey = group.filterKey ?? 'backdrop'
+
+    assert.match(
+      markup,
+      new RegExp(
+        `data-settings-tab="${tabKey}"[^>]*aria-controls="settings-tab-panel-${tabKey}"`,
+      ),
+    )
+    assert.match(
+      markup,
+      new RegExp(
+        `id="settings-tab-panel-${tabKey}"[^>]*data-settings-tab-panel="${tabKey}"[^>]*role="tabpanel"`,
+      ),
+    )
+  }
+
+  assert.match(markup, /data-backdrop-enabled="true"[^>]*type="checkbox"/)
 })
 
 test('escapes tooltip text through React attributes', () => {

@@ -70,6 +70,12 @@ const settingsToggle = document.querySelector<HTMLButtonElement>(
 const settingsClose = document.querySelector<HTMLButtonElement>(
   '[data-settings-close]',
 )!
+const settingsTabs = Array.from(
+  document.querySelectorAll<HTMLButtonElement>('[data-settings-tab]'),
+)
+const settingsTabPanels = Array.from(
+  document.querySelectorAll<HTMLElement>('[data-settings-tab-panel]'),
+)
 const imageInput = document.querySelector<HTMLInputElement>('[data-image-input]')!
 const audioSource = document.querySelector<HTMLSelectElement>('[data-audio-source]')!
 const audioFileField = document.querySelector<HTMLElement>(
@@ -110,6 +116,12 @@ const videoRhythmMode = document.querySelector<HTMLSelectElement>(
 const videoRhythmShape = document.querySelector<HTMLSelectElement>(
   '[data-video-rhythm-shape]',
 )!
+const backdropEnabledInput = document.querySelector<HTMLInputElement>(
+  '[data-backdrop-enabled]',
+)!
+const backdropTabButton = document.querySelector<HTMLButtonElement>(
+  '[data-settings-tab="backdrop"]',
+)!
 const controlSliders = new Map<ControlKey, HTMLInputElement>()
 const controlValues = new Map<ControlKey, HTMLElement>()
 const videoRhythmSliders = new Map<
@@ -123,11 +135,13 @@ const videoRhythmValues = new Map<
 const filterEnabledInputs = new Map<FilterGroupKey, HTMLInputElement>()
 const filterSoloInputs = new Map<FilterGroupKey, HTMLInputElement>()
 const filterGroupSections = new Map<FilterGroupKey, HTMLElement>()
+const filterTabButtons = new Map<FilterGroupKey, HTMLButtonElement>()
 let filterOrder: FilterGroupKey[] = [...DEFAULT_FILTER_ORDER]
 let filterGroupState: FilterGroupState = { ...DEFAULT_FILTER_GROUP_STATE }
 let videoRhythmControls: VideoRhythmControls = {
   ...DEFAULT_VIDEO_RHYTHM_CONTROLS,
 }
+let lastBackdropIntensity = DEFAULT_BLOCK_CONTROLS.backdropIntensity
 
 for (const key of CONTROL_KEYS) {
   controlSliders.set(
@@ -167,6 +181,10 @@ for (const key of DEFAULT_FILTER_ORDER) {
   filterGroupSections.set(
     key,
     document.querySelector<HTMLElement>(`[data-filter-control-group="${key}"]`)!,
+  )
+  filterTabButtons.set(
+    key,
+    document.querySelector<HTMLButtonElement>(`[data-settings-tab="${key}"]`)!,
   )
 }
 
@@ -279,6 +297,11 @@ const applyFilterGroupState = (nextState: FilterGroupState) => {
     section.classList.toggle('is-disabled', !state.enabled)
     section.classList.toggle('is-solo', state.solo)
     section.classList.toggle('is-muted-by-solo', hasSolo && !state.solo)
+
+    const tab = filterTabButtons.get(key)!
+    tab.classList.toggle('is-disabled', !state.enabled)
+    tab.classList.toggle('is-solo', state.solo)
+    tab.classList.toggle('is-muted-by-solo', hasSolo && !state.solo)
   }
 }
 
@@ -288,6 +311,15 @@ const applyBlockControls = (controls: Partial<BlockControls>) => {
 
     if (typeof value === 'number') {
       controlSliders.get(key)!.value = String(value)
+
+      if (key === 'backdropIntensity') {
+        backdropEnabledInput.checked = value > 0
+        backdropTabButton.classList.toggle('is-disabled', value <= 0)
+
+        if (value > 0) {
+          lastBackdropIntensity = value
+        }
+      }
     }
   }
 }
@@ -314,6 +346,27 @@ const setSettingsOpen = (open: boolean) => {
   settingsToggle.setAttribute('aria-label', open ? 'Hide settings' : 'Show settings')
 }
 
+const setActiveSettingsTab = (tabKey: string, focus = false) => {
+  for (const tab of settingsTabs) {
+    const active = tab.dataset.settingsTab === tabKey
+
+    tab.classList.toggle('is-active', active)
+    tab.setAttribute('aria-selected', String(active))
+    tab.tabIndex = active ? 0 : -1
+
+    if (active && focus) {
+      tab.focus()
+    }
+  }
+
+  for (const panel of settingsTabPanels) {
+    const active = panel.dataset.settingsTabPanel === tabKey
+
+    panel.classList.toggle('is-active', active)
+    panel.hidden = !active
+  }
+}
+
 const readBlockControls = (): BlockControls => {
   return CONTROL_KEYS.reduce<BlockControls>(
     (controls, key) => ({
@@ -326,6 +379,14 @@ const readBlockControls = (): BlockControls => {
 
 const syncBlockControls = () => {
   const controls = readBlockControls()
+  const backdropEnabled = controls.backdropIntensity > 0
+
+  backdropEnabledInput.checked = backdropEnabled
+  backdropTabButton.classList.toggle('is-disabled', !backdropEnabled)
+
+  if (backdropEnabled) {
+    lastBackdropIntensity = controls.backdropIntensity
+  }
 
   for (const key of CONTROL_KEYS) {
     controlValues.get(key)!.textContent = `${controls[key]}%`
@@ -356,6 +417,32 @@ settingsToggle.addEventListener('click', () => {
 settingsClose.addEventListener('click', () => {
   setSettingsOpen(false)
 })
+
+for (const tab of settingsTabs) {
+  tab.addEventListener('click', () => {
+    setActiveSettingsTab(tab.dataset.settingsTab!)
+  })
+
+  tab.addEventListener('keydown', (event) => {
+    const currentIndex = settingsTabs.indexOf(tab)
+    let nextIndex = currentIndex
+
+    if (event.key === 'ArrowLeft') {
+      nextIndex = (currentIndex - 1 + settingsTabs.length) % settingsTabs.length
+    } else if (event.key === 'ArrowRight') {
+      nextIndex = (currentIndex + 1) % settingsTabs.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = settingsTabs.length - 1
+    } else {
+      return
+    }
+
+    event.preventDefault()
+    setActiveSettingsTab(settingsTabs[nextIndex].dataset.settingsTab!, true)
+  })
+}
 
 imageInput.addEventListener('change', async () => {
   const file = imageInput.files?.[0]
@@ -535,6 +622,13 @@ for (const slider of controlSliders.values()) {
     syncBlockControls()
   })
 }
+
+backdropEnabledInput.addEventListener('change', () => {
+  controlSliders.get('backdropIntensity')!.value = backdropEnabledInput.checked
+    ? String(lastBackdropIntensity)
+    : '0'
+  syncBlockControls()
+})
 
 videoRhythmMode.addEventListener('change', () => {
   applyVideoRhythmControls(readVideoRhythmControls())

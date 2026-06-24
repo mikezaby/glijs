@@ -194,6 +194,11 @@ export const FILTER_GROUP_LABELS: Record<FilterGroupKey, string> = {
   streaks: 'Streaks',
 }
 
+const DEFAULT_SETTINGS_TAB = 'squares'
+
+const getControlGroupTabKey = (group: ControlGroup) =>
+  group.filterKey ?? 'backdrop'
+
 export const VIDEO_RHYTHM_CONTROL_FIELDS: Array<{
   key: keyof Omit<VideoRhythmControls, 'mode' | 'shape'>
   label: string
@@ -265,10 +270,24 @@ export const InfoTooltip = ({ text }: { text: string }) => (
   </span>
 )
 
-const ControlGroupSection = ({ group }: { group: ControlGroup }) => (
+const ControlGroupSection = ({
+  group,
+  active,
+}: {
+  group: ControlGroup
+  active: boolean
+}) => {
+  const tabKey = getControlGroupTabKey(group)
+
+  return (
   <section
-    className="control-group"
+    id={`settings-tab-panel-${tabKey}`}
+    className={`settings-tab-panel control-group${active ? ' is-active' : ''}`}
+    data-settings-tab-panel={tabKey}
     data-filter-control-group={group.filterKey}
+    role="tabpanel"
+    aria-labelledby={`settings-tab-${tabKey}`}
+    hidden={!active}
   >
     <div className="control-group__head">
       <h2>{group.name}</h2>
@@ -287,7 +306,14 @@ const ControlGroupSection = ({ group }: { group: ControlGroup }) => (
             <span>Solo</span>
           </label>
         </div>
-      ) : null}
+      ) : (
+        <div className="filter-toggles" aria-label={`${group.name} effect controls`}>
+          <label className="toggle-field">
+            <input data-backdrop-enabled type="checkbox" defaultChecked />
+            <span>Enable</span>
+          </label>
+        </div>
+      )}
     </div>
     <div className="settings-row slider-row">
       {group.controls.map((control) => (
@@ -312,10 +338,18 @@ const ControlGroupSection = ({ group }: { group: ControlGroup }) => (
       ))}
     </div>
   </section>
-)
+  )
+}
 
 const VideoRhythmControls = () => (
-  <section className="control-group">
+  <section
+    id="settings-tab-panel-video-rhythm"
+    className="settings-tab-panel control-group"
+    data-settings-tab-panel="video-rhythm"
+    role="tabpanel"
+    aria-labelledby="settings-tab-video-rhythm"
+    hidden
+  >
     <div className="control-group__head">
       <h2>Video rhythm</h2>
     </div>
@@ -369,6 +403,125 @@ const VideoRhythmControls = () => (
       ))}
     </div>
   </section>
+)
+
+const MediaControls = () => (
+  <section
+    id="settings-tab-panel-media"
+    className="settings-tab-panel"
+    data-settings-tab-panel="media"
+    role="tabpanel"
+    aria-labelledby="settings-tab-media"
+    hidden
+  >
+    <div className="settings-row media-row">
+      <label className="file-field">
+        <span>Image / video</span>
+        <input data-image-input type="file" accept="image/*,video/*" />
+        <small data-image-name>No visual media</small>
+      </label>
+
+      <label
+        className="select-field"
+        title="Select whether the visuals react to a WAV file or a live OS audio input."
+      >
+        <span>Audio source</span>
+        <select data-audio-source defaultValue="wav">
+          <option value="wav">WAV file</option>
+          <option value="input">Audio input</option>
+        </select>
+      </label>
+
+      <label className="file-field" data-audio-file-field>
+        <span>WAV</span>
+        <input data-audio-input type="file" accept=".wav,audio/wav" />
+        <small data-audio-name>No audio</small>
+      </label>
+
+      <div className="input-source-field" data-audio-input-controls>
+        <label className="select-field">
+          <span>Input device</span>
+          <select data-audio-device>
+            <option value="">Default input</option>
+          </select>
+        </label>
+        <button
+          data-audio-input-connect
+          type="button"
+          className="transport__button transport__button--secondary"
+        >
+          Use input
+        </button>
+        <small data-audio-input-name>No input connected</small>
+      </div>
+
+      <div className="transport">
+        <button data-play type="button" className="transport__button" disabled>
+          Play
+        </button>
+        <button
+          data-record-video
+          type="button"
+          className="transport__button transport__button--secondary"
+          disabled
+        >
+          Record video
+        </button>
+        <button
+          data-render-video
+          type="button"
+          className="transport__button transport__button--secondary"
+          disabled
+        >
+          Render &amp; download
+        </button>
+        <div className="transport__time">
+          <span data-current-time>00:00</span>
+          <span>/</span>
+          <span data-duration>00:00</span>
+        </div>
+      </div>
+    </div>
+  </section>
+)
+
+const FilterOrderControls = () => (
+  <section
+    id="settings-tab-panel-filter-order"
+    className="settings-tab-panel control-group"
+    data-settings-tab-panel="filter-order"
+    role="tabpanel"
+    aria-labelledby="settings-tab-filter-order"
+    hidden
+  >
+    <div className="control-group__head">
+      <h2>Filter order</h2>
+    </div>
+    <div className="filter-order" data-filter-order-list />
+  </section>
+)
+
+const SettingsTab = ({
+  tabKey,
+  label,
+  active = false,
+}: {
+  tabKey: string
+  label: string
+  active?: boolean
+}) => (
+  <button
+    id={`settings-tab-${tabKey}`}
+    className={`settings-tab${active ? ' is-active' : ''}`}
+    data-settings-tab={tabKey}
+    type="button"
+    role="tab"
+    aria-selected={active}
+    aria-controls={`settings-tab-panel-${tabKey}`}
+    tabIndex={active ? 0 : -1}
+  >
+    {label}
+  </button>
 )
 
 export const FilterOrderItems = ({
@@ -430,7 +583,15 @@ export const App = () => (
       aria-label="Visual settings"
     >
       <div className="settings__header">
-        <span>Settings</span>
+        <div className="settings__title">
+          <span>Settings</span>
+          <p className="status" data-status>
+            Load image or video and WAV.
+          </p>
+        </div>
+        <div className="progress" aria-hidden="true">
+          <div className="progress__fill" data-progress />
+        </div>
         <button
           data-settings-close
           className="settings__close"
@@ -441,93 +602,34 @@ export const App = () => (
         </button>
       </div>
 
-      <div className="settings-row media-row">
-        <label className="file-field">
-          <span>Image / video</span>
-          <input data-image-input type="file" accept="image/*,video/*" />
-          <small data-image-name>No visual media</small>
-        </label>
+      <div className="settings-tabs" data-settings-tabs role="tablist">
+        <SettingsTab tabKey="media" label="Media" />
+        <SettingsTab tabKey="video-rhythm" label="Video rhythm" />
+        <SettingsTab tabKey="filter-order" label="Filter order" />
+        {CONTROL_GROUPS.map((group) => {
+          const tabKey = getControlGroupTabKey(group)
 
-        <label
-          className="select-field"
-          title="Select whether the visuals react to a WAV file or a live OS audio input."
-        >
-          <span>Audio source</span>
-          <select data-audio-source defaultValue="wav">
-            <option value="wav">WAV file</option>
-            <option value="input">Audio input</option>
-          </select>
-        </label>
-
-        <label className="file-field" data-audio-file-field>
-          <span>WAV</span>
-          <input data-audio-input type="file" accept=".wav,audio/wav" />
-          <small data-audio-name>No audio</small>
-        </label>
-
-        <div className="input-source-field" data-audio-input-controls>
-          <label className="select-field">
-            <span>Input device</span>
-            <select data-audio-device>
-              <option value="">Default input</option>
-            </select>
-          </label>
-          <button
-            data-audio-input-connect
-            type="button"
-            className="transport__button transport__button--secondary"
-          >
-            Use input
-          </button>
-          <small data-audio-input-name>No input connected</small>
-        </div>
-
-        <div className="transport">
-          <button data-play type="button" className="transport__button" disabled>
-            Play
-          </button>
-          <button
-            data-record-video
-            type="button"
-            className="transport__button transport__button--secondary"
-            disabled
-          >
-            Record video
-          </button>
-          <button
-            data-render-video
-            type="button"
-            className="transport__button transport__button--secondary"
-            disabled
-          >
-            Render &amp; download
-          </button>
-          <div className="transport__time">
-            <span data-current-time>00:00</span>
-            <span>/</span>
-            <span data-duration>00:00</span>
-          </div>
-        </div>
+          return (
+            <SettingsTab
+              tabKey={tabKey}
+              label={group.name}
+              active={tabKey === DEFAULT_SETTINGS_TAB}
+              key={tabKey}
+            />
+          )
+        })}
       </div>
 
-      <div className="progress" aria-hidden="true">
-        <div className="progress__fill" data-progress />
-      </div>
-
-      <p className="status" data-status>
-        Load image or video and WAV.
-      </p>
-
-      <VideoRhythmControls />
-
-      <section className="control-group">
-        <h2>Filter order</h2>
-        <div className="filter-order" data-filter-order-list />
-      </section>
-
-      <div className="control-groups">
+      <div className="settings-tab-panels">
+        <MediaControls />
+        <VideoRhythmControls />
+        <FilterOrderControls />
         {CONTROL_GROUPS.map((group) => (
-          <ControlGroupSection group={group} key={group.name} />
+          <ControlGroupSection
+            group={group}
+            active={getControlGroupTabKey(group) === DEFAULT_SETTINGS_TAB}
+            key={group.name}
+          />
         ))}
       </div>
     </aside>
