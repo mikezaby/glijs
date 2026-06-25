@@ -339,21 +339,24 @@ const ControlGroupSection = ({
   return (
   <section
     id={`settings-tab-panel-${tabKey}`}
-    className={`settings-tab-panel control-group${active ? ' is-active' : ''}`}
+    className={`control-group settings-tab-panel grid gap-3 content-start p-4${active ? ' is-active' : ''}`}
     data-settings-tab-panel={tabKey}
     data-filter-control-group={group.filterKey}
     role="tabpanel"
     aria-labelledby={`settings-tab-${tabKey}`}
     hidden={!active}
   >
-    <div className="control-group__head">
-      <h2>{group.name}</h2>
+    <div className="flex gap-2.5 items-center">
+      <h2 className="flex flex-1 gap-2 items-center m-0 text-content-primary text-[0.78rem] font-bold uppercase before:w-[3px] before:h-[1.1em] before:rounded-full before:bg-brand before:content-[''] after:flex-1 after:h-px after:bg-border-subtle after:content-['']">
+        {group.name}
+      </h2>
       {group.filterKey ? (
-        <div className="filter-toggles" aria-label={`${group.name} filter controls`}>
-          <label className="toggle-field">
+        <div className="inline-flex gap-1.5 items-center" aria-label={`${group.name} filter controls`}>
+          <label className="inline-flex gap-1.5 items-center text-content-muted text-[0.72rem] font-bold uppercase cursor-pointer">
             <input
               data-filter-enabled={group.filterKey}
               type="checkbox"
+              className="w-3.5 h-3.5 m-0 accent-brand"
               checked={filterGroupState[group.filterKey]?.enabled ?? true}
               onChange={(e) =>
                 onFilterGroupStateChange?.(
@@ -363,12 +366,13 @@ const ControlGroupSection = ({
                 )
               }
             />
-            <span>Enable</span>
+            Enable
           </label>
-          <label className="toggle-field toggle-field--solo">
+          <label className="inline-flex gap-1.5 items-center text-brand text-[0.72rem] font-bold uppercase cursor-pointer">
             <input
               data-filter-solo={group.filterKey}
               type="checkbox"
+              className="w-3.5 h-3.5 m-0 accent-brand"
               checked={filterGroupState[group.filterKey]?.solo ?? false}
               onChange={(e) =>
                 onFilterGroupStateChange?.(
@@ -378,37 +382,39 @@ const ControlGroupSection = ({
                 )
               }
             />
-            <span>Solo</span>
+            Solo
           </label>
         </div>
       ) : (
-        <div className="filter-toggles" aria-label={`${group.name} effect controls`}>
-          <label className="toggle-field">
+        <div className="inline-flex gap-1.5 items-center" aria-label={`${group.name} effect controls`}>
+          <label className="inline-flex gap-1.5 items-center text-content-muted text-[0.72rem] font-bold uppercase cursor-pointer">
             <input
               data-backdrop-enabled
               type="checkbox"
+              className="w-3.5 h-3.5 m-0 accent-brand"
               defaultChecked
             />
-            <span>Enable</span>
+            Enable
           </label>
         </div>
       )}
     </div>
-    <div className="settings-row slider-row">
+    <div className="slider-row">
       {group.controls.map((control) => (
-        <label className="slider-field" title={control.title} key={control.key}>
-          <div className="slider-field__head">
-            <span className="field-label">
+        <label className="grid gap-1.5 min-w-0 py-0.5" title={control.title} key={control.key}>
+          <div className="flex justify-between gap-3 items-center">
+            <span className="inline-flex relative gap-1.5 items-center w-fit text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">
               {control.label}
               <InfoTooltip text={control.title} />
             </span>
-            <strong data-control-value={control.key}>
+            <strong className="text-brand tabular-nums" data-control-value={control.key}>
               {blockControls[control.key]}%
             </strong>
           </div>
           <input
             data-control-slider={control.key}
             type="range"
+            className="w-full accent-brand"
             min="0"
             max="100"
             defaultValue={blockControls[control.key]}
@@ -430,24 +436,27 @@ const VideoRhythmControlsPanel = ({
 }) => (
   <section
     id="settings-tab-panel-video-rhythm"
-    className="settings-tab-panel control-group"
+    className="settings-tab-panel control-group grid gap-3 content-start p-4"
     data-settings-tab-panel="video-rhythm"
     role="tabpanel"
     aria-labelledby="settings-tab-video-rhythm"
     hidden
   >
-    <div className="control-group__head">
-      <h2>Video rhythm</h2>
+    <div className="flex gap-2.5 items-center">
+      <h2 className="flex flex-1 gap-2 items-center m-0 text-content-primary text-[0.78rem] font-bold uppercase before:w-[3px] before:h-[1.1em] before:rounded-full before:bg-brand before:content-[''] after:flex-1 after:h-px after:bg-border-subtle after:content-['']">
+        Video rhythm
+      </h2>
     </div>
     <label
-      className="select-field"
+      className="grid gap-1.5 min-w-0"
       title="Controls how video time reacts to the WAV analysis."
     >
-      <span className="field-label">
+      <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">
         Mode
         <InfoTooltip text="Controls how video time reacts to the WAV analysis." />
       </span>
       <select
+        className="w-full border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-primary"
         data-video-rhythm-mode
         value={videoRhythmControls.mode}
         onChange={(e) =>
@@ -460,14 +469,15 @@ const VideoRhythmControlsPanel = ({
       </select>
     </label>
     <label
-      className="select-field"
+      className="grid gap-1.5 min-w-0"
       title="Controls the visual structure used by multi-seek mode."
     >
-      <span className="field-label">
+      <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">
         Shape
         <InfoTooltip text="Controls the visual structure used by multi-seek mode." />
       </span>
       <select
+        className="w-full border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-primary"
         data-video-rhythm-shape
         value={videoRhythmControls.shape}
         onChange={(e) =>
@@ -478,21 +488,22 @@ const VideoRhythmControlsPanel = ({
         <option value="cubes">Cubes</option>
       </select>
     </label>
-    <div className="settings-row slider-row">
+    <div className="slider-row">
       {VIDEO_RHYTHM_CONTROL_FIELDS.map((control) => (
-        <label className="slider-field" title={control.title} key={control.key}>
-          <div className="slider-field__head">
-            <span className="field-label">
+        <label className="grid gap-1.5 min-w-0 py-0.5" title={control.title} key={control.key}>
+          <div className="flex justify-between gap-3 items-center">
+            <span className="inline-flex relative gap-1.5 items-center w-fit text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">
               {control.label}
               <InfoTooltip text={control.title} />
             </span>
-            <strong data-video-rhythm-value={control.key}>
+            <strong className="text-brand tabular-nums" data-video-rhythm-value={control.key}>
               {videoRhythmControls[control.key]}
             </strong>
           </div>
           <input
             data-video-rhythm-slider={control.key}
             type="range"
+            className="w-full accent-brand"
             min={control.min}
             max={control.max}
             defaultValue={videoRhythmControls[control.key]}
@@ -546,27 +557,31 @@ const MediaControls = ({
       aria-labelledby="settings-tab-media"
       hidden
     >
-      <div className="settings-row media-row">
-        <label className="file-field">
-          <span>Image / video</span>
+      <div className="media-row">
+        <label className="grid gap-1.5 min-w-0">
+          <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">Image / video</span>
           <input
             data-image-input
             type="file"
+            className="w-full border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-muted file:mr-2.5 file:border-0 file:rounded file:py-1.5 file:px-2.5 file:bg-content-primary file:text-[#070707] file:font-bold file:cursor-pointer"
             accept="image/*,video/*"
             onChange={(e) => {
               const file = e.target.files?.[0]
               if (file) onImageFileChange?.(file)
             }}
           />
-          <small data-image-name>{imageFileName ?? 'No visual media'}</small>
+          <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap" data-image-name>
+            {imageFileName ?? 'No visual media'}
+          </small>
         </label>
 
         <label
-          className="select-field"
+          className="grid gap-1.5 min-w-0"
           title="Select whether the visuals react to a WAV file or a live OS audio input."
         >
-          <span>Audio source</span>
+          <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">Audio source</span>
           <select
+            className="w-full border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-primary"
             data-audio-source
             value={audioSourceMode}
             onChange={(e) => onAudioSourceChange?.(e.target.value as AudioSourceMode)}
@@ -577,29 +592,37 @@ const MediaControls = ({
         </label>
 
         <label
-          className={`file-field${isWavFileInputVisible(audioSourceMode) ? '' : ' is-hidden'}`}
+          className={`grid gap-1.5 min-w-0${isWavFileInputVisible(audioSourceMode) ? '' : ' is-hidden'}`}
           data-audio-file-field
         >
-          <span>WAV</span>
+          <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">WAV</span>
           <input
             data-audio-input
             type="file"
+            className="w-full border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-muted file:mr-2.5 file:border-0 file:rounded file:py-1.5 file:px-2.5 file:bg-content-primary file:text-[#070707] file:font-bold file:cursor-pointer"
             accept=".wav,audio/wav"
             onChange={(e) => {
               const file = e.target.files?.[0]
               if (file) onAudioFileChange?.(file)
             }}
           />
-          <small data-audio-name>{audioFileName ?? 'No audio'}</small>
+          <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap" data-audio-name>
+            {audioFileName ?? 'No audio'}
+          </small>
         </label>
 
         <div
           className={`input-source-field${audioSourceMode === 'input' ? ' is-visible' : ''}`}
           data-audio-input-controls
         >
-          <label className="select-field">
-            <span>Input device</span>
-            <select data-audio-device value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
+          <label className="grid gap-1.5 min-w-0">
+            <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">Input device</span>
+            <select
+              className="w-full border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-primary"
+              data-audio-device
+              value={deviceId}
+              onChange={(e) => setDeviceId(e.target.value)}
+            >
               <option value="">Default input</option>
               {audioDevices.map((d) => (
                 <option key={d.id} value={d.id}>{d.label}</option>
@@ -609,19 +632,21 @@ const MediaControls = ({
           <button
             data-audio-input-connect
             type="button"
-            className="transport__button transport__button--secondary"
+            className="border border-border-subtle rounded-md px-[18px] py-2.5 bg-surface-subtle text-content-primary font-extrabold cursor-pointer disabled:cursor-not-allowed disabled:opacity-[0.42]"
             onClick={() => onAudioDeviceConnect?.(deviceId)}
           >
             Use input
           </button>
-          <small data-audio-input-name>{audioInputName ?? 'No input connected'}</small>
+          <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap" data-audio-input-name>
+            {audioInputName ?? 'No input connected'}
+          </small>
         </div>
 
-        <div className="transport">
+        <div className="grid grid-cols-[repeat(3,max-content)_minmax(90px,1fr)] gap-2 items-center min-w-[440px]">
           <button
             data-play
             type="button"
-            className="transport__button"
+            className="border-0 rounded-md px-[18px] py-2.5 bg-brand text-[#050505] font-extrabold cursor-pointer disabled:cursor-not-allowed disabled:opacity-[0.42]"
             disabled={!snapshot?.hasAudio || snapshot?.recording}
             onClick={onPlayClick}
           >
@@ -630,7 +655,7 @@ const MediaControls = ({
           <button
             data-record-video
             type="button"
-            className="transport__button transport__button--secondary"
+            className="border border-border-subtle rounded-md px-[18px] py-2.5 bg-surface-subtle text-content-primary font-extrabold cursor-pointer disabled:cursor-not-allowed disabled:opacity-[0.42]"
             disabled={!snapshot?.hasAudio || !snapshot?.hasVisualMedia || snapshot?.rendering}
             onClick={onRecordClick}
           >
@@ -639,13 +664,13 @@ const MediaControls = ({
           <button
             data-render-video
             type="button"
-            className="transport__button transport__button--secondary"
+            className="border border-border-subtle rounded-md px-[18px] py-2.5 bg-surface-subtle text-content-primary font-extrabold cursor-pointer disabled:cursor-not-allowed disabled:opacity-[0.42]"
             disabled={!snapshot?.hasAudio || !snapshot?.hasVisualMedia || snapshot?.recording}
             onClick={onRenderClick}
           >
             Render &amp; download
           </button>
-          <div className="transport__time">
+          <div className="inline-flex justify-end gap-1.5 text-content-muted tabular-nums">
             <span data-current-time>{snapshot?.currentTime ?? '00:00'}</span>
             <span>/</span>
             <span data-duration>{snapshot?.duration ?? '00:00'}</span>
@@ -659,16 +684,18 @@ const MediaControls = ({
 const FilterOrderControls = () => (
   <section
     id="settings-tab-panel-filter-order"
-    className="settings-tab-panel control-group"
+    className="settings-tab-panel control-group grid gap-3 content-start p-4"
     data-settings-tab-panel="filter-order"
     role="tabpanel"
     aria-labelledby="settings-tab-filter-order"
     hidden
   >
-    <div className="control-group__head">
-      <h2>Filter order</h2>
+    <div className="flex gap-2.5 items-center">
+      <h2 className="flex flex-1 gap-2 items-center m-0 text-content-primary text-[0.78rem] font-bold uppercase before:w-[3px] before:h-[1.1em] before:rounded-full before:bg-brand before:content-[''] after:flex-1 after:h-px after:bg-border-subtle after:content-['']">
+        Filter order
+      </h2>
     </div>
-    <div className="filter-order" data-filter-order-list />
+    <div className="filter-order-grid" data-filter-order-list />
   </section>
 )
 
@@ -683,7 +710,7 @@ const SettingsTab = ({
 }) => (
   <button
     id={`settings-tab-${tabKey}`}
-    className={`settings-tab${active ? ' is-active' : ''}`}
+    className={`settings-tab flex-none border border-transparent border-b-0 rounded-t-[7px] px-[13px] py-2 bg-transparent text-content-muted text-[0.76rem] font-extrabold uppercase tracking-[0.04em] cursor-pointer hover:text-content-primary hover:bg-white/[0.06]${active ? ' is-active' : ''}`}
     data-settings-tab={tabKey}
     type="button"
     role="tab"
@@ -702,13 +729,14 @@ export const FilterOrderItems = ({
 }) => (
   <>
     {filterOrder.map((key, index) => (
-      <div className="filter-order__item" data-filter-order-item={key} key={key}>
-        <span>
+      <div className="grid grid-cols-[1fr_auto] gap-2.5 items-center p-2.5 rounded-md bg-surface-subtle" data-filter-order-item={key} key={key}>
+        <span className="min-w-0 text-content-primary text-[0.86rem] font-bold">
           {index + 1}. {FILTER_GROUP_LABELS[key]}
         </span>
-        <div className="filter-order__actions">
+        <div className="inline-flex gap-1.5">
           <button
             type="button"
+            className="border border-border-subtle rounded-[5px] px-2 py-1.5 bg-surface-subtle text-content-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-[0.35]"
             data-filter-move={key}
             data-filter-direction="up"
             disabled={index === 0}
@@ -718,6 +746,7 @@ export const FilterOrderItems = ({
           </button>
           <button
             type="button"
+            className="border border-border-subtle rounded-[5px] px-2 py-1.5 bg-surface-subtle text-content-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-[0.35]"
             data-filter-move={key}
             data-filter-direction="down"
             disabled={index === filterOrder.length - 1}
@@ -757,44 +786,44 @@ export const App = ({
   onRenderClick,
 }: AppProps) => {
   return (
-    <main className="shell">
+    <main className="relative min-h-screen overflow-hidden">
       <button
         data-settings-toggle
-        className="settings-toggle is-open"
+        className="settings-toggle w-[86px] h-[34px] grid place-items-center border border-border-subtle border-b-0 rounded-t-[8px] px-0 bg-surface-panel/[0.94] text-content-primary cursor-pointer backdrop-blur-[14px] shadow-[0_-10px_36px_rgba(0,0,0,0.38)] is-open"
         type="button"
         aria-expanded="true"
         aria-controls="settings-panel"
         aria-label="Hide settings"
       >
-        <span className="settings-toggle__grip" aria-hidden="true" />
+        <span className="relative w-[42px] h-[3px] rounded-full bg-content-muted before:absolute before:content-[''] before:w-full before:h-full before:rounded-full before:bg-content-muted/[0.62] before:-top-[6px] after:absolute after:content-[''] after:w-full after:h-full after:rounded-full after:bg-content-muted/[0.62] after:top-[6px]" aria-hidden />
       </button>
 
-      <section className="stage">
+      <section className="min-h-screen">
         <div id="sketch-host" className="sketch-host" />
       </section>
 
       <aside
         id="settings-panel"
-        className="settings is-open"
+        className="settings-panel grid grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden w-screen border-t border-border-subtle bg-surface-canvas/[0.88] backdrop-blur-[18px] shadow-[0_-24px_80px_rgba(0,0,0,0.42)] is-open"
         aria-label="Visual settings"
       >
-        <div className="settings__header">
-          <div className="settings__title">
-            <span>Settings</span>
-            <p className="status" data-status>
+        <div className="grid grid-cols-[minmax(180px,auto)_minmax(120px,1fr)_auto] gap-3 items-center min-h-[48px] px-3.5 py-2 border-b border-border-subtle">
+          <div className="flex gap-3 items-baseline min-w-0">
+            <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">Settings</span>
+            <p className="min-w-0 overflow-hidden text-content-muted text-[0.78rem] text-ellipsis whitespace-nowrap m-0 min-h-[1.4em]" data-status>
               {status ?? 'Load image or video and WAV.'}
             </p>
           </div>
-          <div className="progress" aria-hidden="true">
+          <div className="overflow-hidden h-1.5 min-w-[120px] rounded-full bg-surface-subtle" aria-hidden="true">
             <div
-              className="progress__fill"
+              className="progress-fill"
               data-progress
               style={{ width: `${snapshot?.progressPercent ?? 0}%` }}
             />
           </div>
           <button
             data-settings-close
-            className="settings__close"
+            className="border border-border-subtle rounded-md px-2.5 py-[7px] bg-surface-panel text-content-muted cursor-pointer"
             type="button"
             aria-label="Hide settings"
           >
@@ -802,7 +831,7 @@ export const App = ({
           </button>
         </div>
 
-        <div className="settings-tabs" data-settings-tabs role="tablist">
+        <div className="flex gap-1 overflow-x-auto px-3.5 pt-2 pb-0 border-b border-border-subtle [scrollbar-width:thin]" data-settings-tabs role="tablist">
           <SettingsTab tabKey="media" label="Media" />
           <SettingsTab tabKey="video-rhythm" label="Video rhythm" />
           <SettingsTab tabKey="filter-order" label="Filter order" />
@@ -820,7 +849,7 @@ export const App = ({
           })}
         </div>
 
-        <div className="settings-tab-panels">
+        <div className="min-h-0 overflow-auto">
           <MediaControls
             audioSourceMode={audioSourceMode}
             audioDevices={audioDevices}
