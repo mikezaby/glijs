@@ -70,6 +70,9 @@ const rerenderApp = () => {
   })
 }
 
+// Initial render to mount #sketch-host into the DOM before createGlitchSketch
+rerenderApp()
+
 const sketchHost = document.querySelector<HTMLElement>('#sketch-host')!
 
 let filterOrder: FilterGroupKey[] = [...DEFAULT_FILTER_ORDER]

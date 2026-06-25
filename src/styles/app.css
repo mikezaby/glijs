@@ -8,7 +8,8 @@
 
 body {
   margin: 0;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
 }
 
 button,
@@ -18,13 +19,12 @@ select {
 }
 
 #app {
-  min-height: 100vh;
+  height: 100%;
 }
 
 .sketch-host {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   background: #030303;
 }
@@ -35,35 +35,31 @@ select {
   height: 100%;
 }
 
-/* Bottom drawer slide animation */
+/* Settings area: sits at the bottom of the flex column */
+.settings-area {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Toggle tab sticks up above the panel */
+.settings-toggle {
+  position: absolute;
+  top: -33px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+}
+
+/* Panel collapses to zero height when closed */
 .settings-panel {
-  position: fixed;
-  z-index: 40;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: var(--settings-height);
+  height: 0;
   max-height: var(--settings-height);
-  transform: translateY(100%);
-  transition: transform 180ms ease;
+  overflow: hidden;
+  transition: height 180ms ease;
 }
 
 .settings-panel.is-open {
-  transform: translateY(0);
-}
-
-/* Toggle grip rides above the panel */
-.settings-toggle {
-  position: fixed;
-  z-index: 50;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  transition: bottom 180ms ease;
-}
-
-.settings-toggle.is-open {
-  bottom: calc(var(--settings-height) - 1px);
+  height: var(--settings-height);
 }
 
 /* Tab panel visibility */

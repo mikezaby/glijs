@@ -17,7 +17,8 @@ test('renders the application shell and controls through React components', () =
     React.createElement(App),
   )
 
-  assert.match(markup, /<main class="relative min-h-screen overflow-hidden">/)
+  assert.match(markup, /<main class="flex flex-col h-screen overflow-hidden">/)
+  assert.match(markup, /id="sketch-host"/)
   assert.match(markup, /data-image-input="true"/)
   assert.match(markup, /data-audio-source="true"/)
   assert.match(markup, /data-audio-file-field="true"/)

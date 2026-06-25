@@ -837,7 +837,10 @@ export const App = ({
   ]
 
   return (
-    <main className="relative min-h-screen overflow-hidden">
+    <main className="flex flex-col h-screen overflow-hidden">
+      <div id="sketch-host" className="sketch-host" />
+
+      <div className="settings-area">
       <button
         className={`settings-toggle w-[86px] h-[34px] grid place-items-center border border-b-0 rounded-t-[8px] px-0 text-content-primary cursor-pointer backdrop-blur-[14px] shadow-[0_-10px_36px_rgba(0,0,0,0.38)] transition-colors${settingsOpen ? ' is-open border-white/[0.22] bg-black/[0.92]' : ' border-border-subtle bg-surface-panel/[0.94]'}`}
         type="button"
@@ -936,6 +939,7 @@ export const App = ({
           ))}
         </div>
       </aside>
+      </div>
     </main>
   )
 }
