@@ -1,4 +1,4 @@
-import { Fader } from '@blibliki/ui'
+import { Fader, Switch } from '@blibliki/ui'
 import { useState } from 'react'
 import type { AudioSourceMode } from './audioSource'
 import { isWavFileInputVisible } from './audioSource'
@@ -325,6 +325,7 @@ const ControlGroupSection = ({
   active,
   blockControls,
   filterGroupState,
+  lastBackdropIntensity,
   onControlChange,
   onFilterGroupStateChange,
 }: {
@@ -332,6 +333,7 @@ const ControlGroupSection = ({
   active: boolean
   blockControls: BlockControls
   filterGroupState: FilterGroupState
+  lastBackdropIntensity?: number
   onControlChange?: AppProps['onControlChange']
   onFilterGroupStateChange?: AppProps['onFilterGroupStateChange']
 }) => {
@@ -354,15 +356,15 @@ const ControlGroupSection = ({
       {group.filterKey ? (
         <div className="inline-flex gap-1.5 items-center" aria-label={`${group.name} filter controls`}>
           <label className="inline-flex gap-1.5 items-center text-content-muted text-[0.72rem] font-bold uppercase cursor-pointer">
-            <input
+            <Switch
               data-filter-enabled={group.filterKey}
-              type="checkbox"
-              className="w-3.5 h-3.5 m-0 accent-brand"
+              size="sm"
+              color="primary"
               checked={filterGroupState[group.filterKey]?.enabled ?? true}
-              onChange={(e) =>
+              onCheckedChange={(enabled) =>
                 onFilterGroupStateChange?.(
                   group.filterKey!,
-                  e.target.checked,
+                  enabled,
                   filterGroupState[group.filterKey!]?.solo ?? false,
                 )
               }
@@ -370,16 +372,16 @@ const ControlGroupSection = ({
             Enable
           </label>
           <label className="inline-flex gap-1.5 items-center text-brand text-[0.72rem] font-bold uppercase cursor-pointer">
-            <input
+            <Switch
               data-filter-solo={group.filterKey}
-              type="checkbox"
-              className="w-3.5 h-3.5 m-0 accent-brand"
+              size="sm"
+              color="secondary"
               checked={filterGroupState[group.filterKey]?.solo ?? false}
-              onChange={(e) =>
+              onCheckedChange={(solo) =>
                 onFilterGroupStateChange?.(
                   group.filterKey!,
                   filterGroupState[group.filterKey!]?.enabled ?? true,
-                  e.target.checked,
+                  solo,
                 )
               }
             />
@@ -389,11 +391,19 @@ const ControlGroupSection = ({
       ) : (
         <div className="inline-flex gap-1.5 items-center" aria-label={`${group.name} effect controls`}>
           <label className="inline-flex gap-1.5 items-center text-content-muted text-[0.72rem] font-bold uppercase cursor-pointer">
-            <input
+            <Switch
               data-backdrop-enabled
-              type="checkbox"
-              className="w-3.5 h-3.5 m-0 accent-brand"
-              defaultChecked
+              size="sm"
+              color="primary"
+              checked={(blockControls.backdropIntensity ?? 0) > 0}
+              onCheckedChange={(checked) =>
+                onControlChange?.(
+                  'backdropIntensity',
+                  checked
+                    ? (lastBackdropIntensity ?? DEFAULT_BLOCK_CONTROLS.backdropIntensity)
+                    : 0,
+                )
+              }
             />
             Enable
           </label>
@@ -751,7 +761,7 @@ export const App = ({
   imageFileName,
   audioFileName,
   audioInputName,
-  lastBackdropIntensity: _lastBackdropIntensity = DEFAULT_BLOCK_CONTROLS.backdropIntensity,
+  lastBackdropIntensity = DEFAULT_BLOCK_CONTROLS.backdropIntensity,
   snapshot,
   status,
   onControlChange,
@@ -858,6 +868,7 @@ export const App = ({
               key={group.name}
               blockControls={blockControls}
               filterGroupState={filterGroupState}
+              lastBackdropIntensity={lastBackdropIntensity}
               onControlChange={onControlChange}
               onFilterGroupStateChange={onFilterGroupStateChange}
             />

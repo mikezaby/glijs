@@ -59,7 +59,7 @@ test('renders bottom settings tabs with one panel for every effect', () => {
     )
   }
 
-  assert.match(markup, /data-backdrop-enabled="true"[^>]*type="checkbox"/)
+  assert.match(markup, /role="switch"[^>]*data-backdrop-enabled="true"/)
 })
 
 test('escapes tooltip text through React attributes', () => {
