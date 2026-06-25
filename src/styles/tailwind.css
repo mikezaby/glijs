@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: var(--ui-radius-sm);
+  --radius-md: var(--ui-radius-md);
+  --radius-lg: var(--ui-radius-lg);
+
+  --color-surface-canvas: var(--ui-color-surface-0);
+  --color-surface-panel: var(--ui-color-surface-1);
+  --color-surface-raised: var(--ui-color-surface-raised);
+  --color-surface-subtle: var(--ui-color-surface-2);
+
+  --color-content-primary: var(--ui-color-text-primary);
+  --color-content-secondary: var(--ui-color-text-secondary);
+  --color-content-muted: var(--ui-color-text-muted);
+
+  --color-border-subtle: var(--ui-color-border-subtle);
+  --color-border-strong: color-mix(
+    in oklab,
+    var(--ui-color-border-subtle),
+    var(--ui-color-text-primary) 18%
+  );
+
+  --color-brand: var(--ui-color-primary-500);
+  --color-brand-hover: var(--ui-color-primary-600);
+  --color-brand-contrast: var(--ui-color-primary-contrast);
+}
