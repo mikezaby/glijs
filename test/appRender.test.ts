@@ -26,7 +26,7 @@ test('renders the application shell and controls through React components', () =
   assert.match(markup, /data-audio-device="true"/)
   assert.match(markup, /data-audio-input-connect="true"/)
   assert.match(markup, /data-video-rhythm-mode="true"/)
-  assert.match(markup, /data-control-slider="spread"/)
+  assert.match(markup, /aria-label="Spread"/)
   assert.match(markup, /data-filter-enabled="rgbSplit"/)
   assert.match(markup, /data-filter-order-list="true"/)
 })

@@ -1,3 +1,4 @@
+import { Fader } from '@blibliki/ui'
 import { useState } from 'react'
 import type { AudioSourceMode } from './audioSource'
 import { isWavFileInputVisible } from './audioSource'
@@ -401,26 +402,16 @@ const ControlGroupSection = ({
     </div>
     <div className="slider-row">
       {group.controls.map((control) => (
-        <label className="grid gap-1.5 min-w-0 py-0.5" title={control.title} key={control.key}>
-          <div className="flex justify-between gap-3 items-center">
-            <span className="inline-flex relative gap-1.5 items-center w-fit text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">
-              {control.label}
-              <InfoTooltip text={control.title} />
-            </span>
-            <strong className="text-brand tabular-nums" data-control-value={control.key}>
-              {blockControls[control.key]}%
-            </strong>
-          </div>
-          <input
-            data-control-slider={control.key}
-            type="range"
-            className="w-full accent-brand"
-            min="0"
-            max="100"
-            defaultValue={blockControls[control.key]}
-            onChange={(e) => onControlChange?.(control.key, Number(e.target.value))}
-          />
-        </label>
+        <Fader
+          key={control.key}
+          name={control.label}
+          title={control.title}
+          min={0}
+          max={100}
+          orientation="horizontal"
+          value={blockControls[control.key]}
+          onChange={(value) => onControlChange?.(control.key, value)}
+        />
       ))}
     </div>
   </section>
@@ -490,28 +481,18 @@ const VideoRhythmControlsPanel = ({
     </label>
     <div className="slider-row">
       {VIDEO_RHYTHM_CONTROL_FIELDS.map((control) => (
-        <label className="grid gap-1.5 min-w-0 py-0.5" title={control.title} key={control.key}>
-          <div className="flex justify-between gap-3 items-center">
-            <span className="inline-flex relative gap-1.5 items-center w-fit text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">
-              {control.label}
-              <InfoTooltip text={control.title} />
-            </span>
-            <strong className="text-brand tabular-nums" data-video-rhythm-value={control.key}>
-              {videoRhythmControls[control.key]}
-            </strong>
-          </div>
-          <input
-            data-video-rhythm-slider={control.key}
-            type="range"
-            className="w-full accent-brand"
-            min={control.min}
-            max={control.max}
-            defaultValue={videoRhythmControls[control.key]}
-            onChange={(e) =>
-              onVideoRhythmChange?.({ ...videoRhythmControls, [control.key]: Number(e.target.value) })
-            }
-          />
-        </label>
+        <Fader
+          key={control.key}
+          name={control.label}
+          title={control.title}
+          min={control.min}
+          max={control.max}
+          orientation="horizontal"
+          value={videoRhythmControls[control.key] as number}
+          onChange={(value) =>
+            onVideoRhythmChange?.({ ...videoRhythmControls, [control.key]: value })
+          }
+        />
       ))}
     </div>
   </section>
