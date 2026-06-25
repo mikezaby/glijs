@@ -45,10 +45,10 @@ importers:
     dependencies:
       '@blibliki/ui':
         specifier: workspace:*
-        version: link:../../../blibliki/packages/ui
+        version: link:../blibliki/packages/ui
       '@blibliki/utils':
         specifier: workspace:*
-        version: link:../../../blibliki/packages/utils
+        version: link:../blibliki/packages/utils
       '@tailwindcss/vite':
         specifier: ^4.3.1
         version: 4.3.1(vite@8.0.9(@types/node@26.0.0)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.2))
@@ -90,7 +90,7 @@ importers:
         specifier: ^8.0.9
         version: 8.0.9(@types/node@26.0.0)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.2)
 
-  ../../../blibliki/packages/ui:
+  ../blibliki/packages/ui:
     dependencies:
       '@blibliki/utils':
         specifier: workspace:^
@@ -136,7 +136,7 @@ importers:
         specifier: catalog:react-19
         version: 19.2.7(react@19.2.7)
 
-  ../../../blibliki/packages/utils:
+  ../blibliki/packages/utils:
     dependencies:
       crypto-js:
         specifier: ^4.2.0

@@ -1,7 +1,7 @@
 packages:
   - .
-  - ../../../blibliki/packages/ui
-  - ../../../blibliki/packages/utils
+  - ../blibliki/packages/ui
+  - ../blibliki/packages/utils
 
 # ponytail: catalog entries mirror blibliki's catalogs so workspace:^ and catalog: refs resolve
 catalogs:
