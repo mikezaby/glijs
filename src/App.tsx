@@ -1,5 +1,5 @@
 import { Button, Encoder, OptionSelect, Switch } from '@blibliki/ui'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { AudioSourceMode } from './audioSource'
 import { isWavFileInputVisible } from './audioSource'
 import type {
@@ -828,6 +828,21 @@ export const App = ({
 }: AppProps) => {
   const [settingsOpen, setSettingsOpen] = useState(true)
   const [activeTab, setActiveTab] = useState(DEFAULT_SETTINGS_TAB)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', handler)
+    return () => document.removeEventListener('fullscreenchange', handler)
+  }, [])
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen()
+    } else {
+      void document.documentElement.requestFullscreen()
+    }
+  }
 
   const allTabKeys = [
     'media',
@@ -840,7 +855,7 @@ export const App = ({
     <main className="flex flex-col h-screen overflow-hidden">
       <div id="sketch-host" className="sketch-host" />
 
-      <div className="settings-area">
+      {!isFullscreen && <div className="settings-area">
       <button
         className={`settings-toggle w-[86px] h-[34px] grid place-items-center border border-b-0 rounded-t-[8px] px-0 text-content-primary cursor-pointer backdrop-blur-[14px] shadow-[0_-10px_36px_rgba(0,0,0,0.38)] transition-colors${settingsOpen ? ' is-open border-white/[0.22] bg-black/[0.92]' : ' border-border-subtle bg-surface-panel/[0.94]'}`}
         type="button"
@@ -870,6 +885,16 @@ export const App = ({
               style={{ width: `${snapshot?.progressPercent ?? 0}%` }}
             />
           </div>
+          <div className="flex gap-2">
+          <Button
+            variant="outlined"
+            color="neutral"
+            size="sm"
+            type="button"
+            onClick={toggleFullscreen}
+          >
+            {isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          </Button>
           <Button
             variant="outlined"
             color="neutral"
@@ -880,6 +905,7 @@ export const App = ({
           >
             Close
           </Button>
+          </div>
         </div>
 
         <div className="flex gap-1 overflow-x-auto px-3.5 pt-2 pb-0 border-b border-border-subtle [scrollbar-width:thin]" data-settings-tabs role="tablist">
@@ -939,7 +965,7 @@ export const App = ({
           ))}
         </div>
       </aside>
-      </div>
+      </div>}
     </main>
   )
 }
