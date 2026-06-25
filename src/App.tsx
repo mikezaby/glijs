@@ -1,4 +1,4 @@
-import { Button, Fader, OptionSelect, Switch } from '@blibliki/ui'
+import { Button, Encoder, OptionSelect, Switch } from '@blibliki/ui'
 import { useState } from 'react'
 import type { AudioSourceMode } from './audioSource'
 import { isWavFileInputVisible } from './audioSource'
@@ -411,16 +411,17 @@ const ControlGroupSection = ({
     </div>
     <div className="slider-row">
       {group.controls.map((control) => (
-        <Fader
-          key={control.key}
-          name={control.label}
-          title={control.title}
-          min={0}
-          max={100}
-          orientation="horizontal"
-          value={blockControls[control.key]}
-          onChange={(value) => onControlChange?.(control.key, value)}
-        />
+        <div key={control.key} className="flex flex-col items-center gap-1">
+          <Encoder
+            name={control.label}
+            title={control.title}
+            min={0}
+            max={100}
+            value={blockControls[control.key]}
+            onChange={(value) => onControlChange?.(control.key, value)}
+          />
+          <span className="text-content-secondary text-[0.72rem] uppercase tracking-[0.04em]">{control.label}</span>
+        </div>
       ))}
     </div>
   </section>
@@ -490,18 +491,19 @@ const VideoRhythmControlsPanel = ({
     </div>
     <div className="slider-row">
       {VIDEO_RHYTHM_CONTROL_FIELDS.map((control) => (
-        <Fader
-          key={control.key}
-          name={control.label}
-          title={control.title}
-          min={control.min}
-          max={control.max}
-          orientation="horizontal"
-          value={videoRhythmControls[control.key] as number}
-          onChange={(value) =>
-            onVideoRhythmChange?.({ ...videoRhythmControls, [control.key]: value })
-          }
-        />
+        <div key={control.key} className="flex flex-col items-center gap-1">
+          <Encoder
+            name={control.label}
+            title={control.title}
+            min={control.min}
+            max={control.max}
+            value={videoRhythmControls[control.key] as number}
+            onChange={(value) =>
+              onVideoRhythmChange?.({ ...videoRhythmControls, [control.key]: value })
+            }
+          />
+          <span className="text-content-secondary text-[0.72rem] uppercase tracking-[0.04em]">{control.label}</span>
+        </div>
       ))}
     </div>
   </section>
@@ -718,7 +720,7 @@ const SettingsTab = ({
 }) => (
   <button
     id={`settings-tab-${tabKey}`}
-    className={`settings-tab flex-none border border-transparent border-b-0 rounded-t-[7px] px-[13px] py-2 bg-transparent text-content-muted text-[0.76rem] font-extrabold uppercase tracking-[0.04em] cursor-pointer hover:text-content-primary hover:bg-white/[0.06]${active ? ' is-active' : ''}`}
+    className={`settings-tab flex-none border border-b-0 rounded-t-[7px] px-[13px] py-2 text-[0.76rem] font-extrabold uppercase tracking-[0.04em] cursor-pointer${active ? ' is-active border-border-subtle bg-surface-panel text-content-primary' : ' border-transparent bg-transparent text-content-muted hover:text-content-primary hover:bg-white/[0.06]'}`}
     data-settings-tab={tabKey}
     type="button"
     role="tab"

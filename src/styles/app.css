@@ -1,5 +1,5 @@
 :root {
-  --settings-height: min(340px, 48vh);
+  --settings-height: min(480px, 62vh);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -92,8 +92,8 @@ select {
 
 /* Slider row: auto-fit grid */
 .slider-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: end;
 }
@@ -180,7 +180,7 @@ select {
 
 @media (max-width: 860px) {
   :root {
-    --settings-height: min(440px, 66vh);
+    --settings-height: min(560px, 72vh);
   }
 
   .media-row {
@@ -194,7 +194,7 @@ select {
 
 @media (max-width: 560px) {
   :root {
-    --settings-height: min(500px, 72vh);
+    --settings-height: min(620px, 80vh);
   }
 
   .media-row,
