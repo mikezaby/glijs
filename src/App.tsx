@@ -431,9 +431,11 @@ const ControlGroupSection = ({
 const VideoRhythmControlsPanel = ({
   videoRhythmControls,
   onVideoRhythmChange,
+  hidden,
 }: {
   videoRhythmControls: VideoRhythmControls
   onVideoRhythmChange?: AppProps['onVideoRhythmChange']
+  hidden?: boolean
 }) => (
   <section
     id="settings-tab-panel-video-rhythm"
@@ -441,7 +443,7 @@ const VideoRhythmControlsPanel = ({
     data-settings-tab-panel="video-rhythm"
     role="tabpanel"
     aria-labelledby="settings-tab-video-rhythm"
-    hidden
+    hidden={hidden}
   >
     <div className="flex gap-2.5 items-center">
       <h2 className="flex flex-1 gap-2 items-center m-0 text-content-primary text-[0.78rem] font-bold uppercase before:w-[3px] before:h-[1.1em] before:rounded-full before:bg-brand before:content-[''] after:flex-1 after:h-px after:bg-border-subtle after:content-['']">
@@ -513,6 +515,7 @@ const MediaControls = ({
   audioFileName,
   audioInputName,
   snapshot,
+  hidden,
   onAudioSourceChange,
   onAudioDeviceConnect,
   onImageFileChange,
@@ -527,6 +530,7 @@ const MediaControls = ({
   audioFileName?: string
   audioInputName?: string
   snapshot?: SketchUISnapshot
+  hidden?: boolean
   onAudioSourceChange?: AppProps['onAudioSourceChange']
   onAudioDeviceConnect?: AppProps['onAudioDeviceConnect']
   onImageFileChange?: AppProps['onImageFileChange']
@@ -544,7 +548,7 @@ const MediaControls = ({
       data-settings-tab-panel="media"
       role="tabpanel"
       aria-labelledby="settings-tab-media"
-      hidden
+      hidden={hidden}
     >
       <div className="media-row">
         <label className="grid gap-1.5 min-w-0">
@@ -664,14 +668,14 @@ const MediaControls = ({
   )
 }
 
-const FilterOrderControls = () => (
+const FilterOrderControls = ({ hidden }: { hidden?: boolean }) => (
   <section
     id="settings-tab-panel-filter-order"
     className="settings-tab-panel control-group grid gap-3 content-start p-4"
     data-settings-tab-panel="filter-order"
     role="tabpanel"
     aria-labelledby="settings-tab-filter-order"
-    hidden
+    hidden={hidden}
   >
     <div className="flex gap-2.5 items-center">
       <h2 className="flex flex-1 gap-2 items-center m-0 text-content-primary text-[0.78rem] font-bold uppercase before:w-[3px] before:h-[1.1em] before:rounded-full before:bg-brand before:content-[''] after:flex-1 after:h-px after:bg-border-subtle after:content-['']">
@@ -686,10 +690,14 @@ const SettingsTab = ({
   tabKey,
   label,
   active = false,
+  allTabKeys,
+  onActivate,
 }: {
   tabKey: string
   label: string
   active?: boolean
+  allTabKeys: string[]
+  onActivate: (key: string) => void
 }) => (
   <button
     id={`settings-tab-${tabKey}`}
@@ -700,6 +708,18 @@ const SettingsTab = ({
     aria-selected={active}
     aria-controls={`settings-tab-panel-${tabKey}`}
     tabIndex={active ? 0 : -1}
+    onClick={() => onActivate(tabKey)}
+    onKeyDown={(e) => {
+      const idx = allTabKeys.indexOf(tabKey)
+      let nextIdx = idx
+      if (e.key === 'ArrowLeft') nextIdx = (idx - 1 + allTabKeys.length) % allTabKeys.length
+      else if (e.key === 'ArrowRight') nextIdx = (idx + 1) % allTabKeys.length
+      else if (e.key === 'Home') nextIdx = 0
+      else if (e.key === 'End') nextIdx = allTabKeys.length - 1
+      else return
+      e.preventDefault()
+      onActivate(allTabKeys[nextIdx]!)
+    }}
   >
     {label}
   </button>
@@ -768,15 +788,25 @@ export const App = ({
   onRecordClick,
   onRenderClick,
 }: AppProps) => {
+  const [settingsOpen, setSettingsOpen] = useState(true)
+  const [activeTab, setActiveTab] = useState(DEFAULT_SETTINGS_TAB)
+
+  const allTabKeys = [
+    'media',
+    'video-rhythm',
+    'filter-order',
+    ...CONTROL_GROUPS.map(getControlGroupTabKey),
+  ]
+
   return (
     <main className="relative min-h-screen overflow-hidden">
       <button
-        data-settings-toggle
-        className="settings-toggle w-[86px] h-[34px] grid place-items-center border border-border-subtle border-b-0 rounded-t-[8px] px-0 bg-surface-panel/[0.94] text-content-primary cursor-pointer backdrop-blur-[14px] shadow-[0_-10px_36px_rgba(0,0,0,0.38)] is-open"
+        className={`settings-toggle w-[86px] h-[34px] grid place-items-center border border-border-subtle border-b-0 rounded-t-[8px] px-0 bg-surface-panel/[0.94] text-content-primary cursor-pointer backdrop-blur-[14px] shadow-[0_-10px_36px_rgba(0,0,0,0.38)]${settingsOpen ? ' is-open' : ''}`}
         type="button"
-        aria-expanded="true"
+        aria-expanded={settingsOpen}
         aria-controls="settings-panel"
-        aria-label="Hide settings"
+        aria-label={settingsOpen ? 'Hide settings' : 'Show settings'}
+        onClick={() => setSettingsOpen((v) => !v)}
       >
         <span className="relative w-[42px] h-[3px] rounded-full bg-content-muted before:absolute before:content-[''] before:w-full before:h-full before:rounded-full before:bg-content-muted/[0.62] before:-top-[6px] after:absolute after:content-[''] after:w-full after:h-full after:rounded-full after:bg-content-muted/[0.62] after:top-[6px]" aria-hidden />
       </button>
@@ -787,7 +817,7 @@ export const App = ({
 
       <aside
         id="settings-panel"
-        className="settings-panel grid grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden w-screen border-t border-border-subtle bg-surface-canvas/[0.88] backdrop-blur-[18px] shadow-[0_-24px_80px_rgba(0,0,0,0.42)] is-open"
+        className={`settings-panel grid grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden w-screen border-t border-border-subtle bg-surface-canvas/[0.88] backdrop-blur-[18px] shadow-[0_-24px_80px_rgba(0,0,0,0.42)]${settingsOpen ? ' is-open' : ''}`}
         aria-label="Visual settings"
       >
         <div className="grid grid-cols-[minmax(180px,auto)_minmax(120px,1fr)_auto] gap-3 items-center min-h-[48px] px-3.5 py-2 border-b border-border-subtle">
@@ -810,16 +840,16 @@ export const App = ({
             size="sm"
             type="button"
             aria-label="Hide settings"
-            data-settings-close
+            onClick={() => setSettingsOpen(false)}
           >
             Close
           </Button>
         </div>
 
         <div className="flex gap-1 overflow-x-auto px-3.5 pt-2 pb-0 border-b border-border-subtle [scrollbar-width:thin]" data-settings-tabs role="tablist">
-          <SettingsTab tabKey="media" label="Media" />
-          <SettingsTab tabKey="video-rhythm" label="Video rhythm" />
-          <SettingsTab tabKey="filter-order" label="Filter order" />
+          <SettingsTab tabKey="media" label="Media" active={activeTab === 'media'} allTabKeys={allTabKeys} onActivate={setActiveTab} />
+          <SettingsTab tabKey="video-rhythm" label="Video rhythm" active={activeTab === 'video-rhythm'} allTabKeys={allTabKeys} onActivate={setActiveTab} />
+          <SettingsTab tabKey="filter-order" label="Filter order" active={activeTab === 'filter-order'} allTabKeys={allTabKeys} onActivate={setActiveTab} />
           {CONTROL_GROUPS.map((group) => {
             const tabKey = getControlGroupTabKey(group)
 
@@ -827,7 +857,9 @@ export const App = ({
               <SettingsTab
                 tabKey={tabKey}
                 label={group.name}
-                active={tabKey === DEFAULT_SETTINGS_TAB}
+                active={activeTab === tabKey}
+                allTabKeys={allTabKeys}
+                onActivate={setActiveTab}
                 key={tabKey}
               />
             )
@@ -842,6 +874,7 @@ export const App = ({
             audioFileName={audioFileName}
             audioInputName={audioInputName}
             snapshot={snapshot}
+            hidden={activeTab !== 'media'}
             onAudioSourceChange={onAudioSourceChange}
             onAudioDeviceConnect={onAudioDeviceConnect}
             onImageFileChange={onImageFileChange}
@@ -853,12 +886,13 @@ export const App = ({
           <VideoRhythmControlsPanel
             videoRhythmControls={videoRhythmControls}
             onVideoRhythmChange={onVideoRhythmChange}
+            hidden={activeTab !== 'video-rhythm'}
           />
-          <FilterOrderControls />
+          <FilterOrderControls hidden={activeTab !== 'filter-order'} />
           {CONTROL_GROUPS.map((group) => (
             <ControlGroupSection
               group={group}
-              active={getControlGroupTabKey(group) === DEFAULT_SETTINGS_TAB}
+              active={getControlGroupTabKey(group) === activeTab}
               key={group.name}
               blockControls={blockControls}
               filterGroupState={filterGroupState}
