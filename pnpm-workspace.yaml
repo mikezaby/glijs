@@ -1,0 +1,25 @@
+packages:
+  - .
+  - ../../../blibliki/packages/ui
+  - ../../../blibliki/packages/utils
+
+# ponytail: catalog entries mirror blibliki's catalogs so workspace:^ and catalog: refs resolve
+catalogs:
+  tailwindcss:
+    tailwind-merge: 3.6.0
+    tailwindcss: 4.3.1
+    "@tailwindcss/vite": 4.3.1
+  utils:
+    es-toolkit: 1.47.1
+  node:
+    "@types/node": 26.0.0
+  web-audio:
+    node-web-audio-api: 2.0.0
+  test:
+    vitest: 4.1.9
+  react-19:
+    react: 19.2.7
+    react-dom: 19.2.7
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+    "@vitejs/plugin-react": 6.0.2

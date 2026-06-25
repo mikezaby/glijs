@@ -19,8 +19,14 @@
     "vite": "^8.0.9"
   },
   "dependencies": {
+    "@blibliki/ui": "workspace:*",
+    "@blibliki/utils": "workspace:*",
+    "@tailwindcss/vite": "^4.3.1",
+    "clsx": "^2.1.1",
     "p5": "^2.2.3",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.1"
   }
 }
