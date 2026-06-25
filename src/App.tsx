@@ -344,7 +344,7 @@ const ControlGroupSection = ({
     id={`settings-tab-panel-${tabKey}`}
     className={`control-group settings-tab-panel grid gap-3 content-start p-4${active ? ' is-active' : ''}`}
     data-settings-tab-panel={tabKey}
-    data-filter-control-group={group.filterKey}
+
     role="tabpanel"
     aria-labelledby={`settings-tab-${tabKey}`}
     hidden={!active}
@@ -373,7 +373,6 @@ const ControlGroupSection = ({
           </label>
           <label className="inline-flex gap-1.5 items-center text-brand text-[0.72rem] font-bold uppercase cursor-pointer">
             <Switch
-              data-filter-solo={group.filterKey}
               size="sm"
               color="secondary"
               checked={filterGroupState[group.filterKey]?.solo ?? false}
@@ -563,7 +562,7 @@ const MediaControls = ({
               if (file) onImageFileChange?.(file)
             }}
           />
-          <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap" data-image-name>
+          <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap">
             {imageFileName ?? 'No visual media'}
           </small>
         </label>
@@ -595,14 +594,13 @@ const MediaControls = ({
               if (file) onAudioFileChange?.(file)
             }}
           />
-          <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap" data-audio-name>
+          <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap">
             {audioFileName ?? 'No audio'}
           </small>
         </label>
 
         <div
           className={`input-source-field${audioSourceMode === 'input' ? ' is-visible' : ''}`}
-          data-audio-input-controls
         >
           <div className="grid gap-1.5 min-w-0" data-audio-device>
             <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">Input device</span>
@@ -624,7 +622,7 @@ const MediaControls = ({
           >
             Use input
           </Button>
-          <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap" data-audio-input-name>
+          <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap">
             {audioInputName ?? 'No input connected'}
           </small>
         </div>
@@ -633,7 +631,6 @@ const MediaControls = ({
           <Button
             variant="contained"
             color="primary"
-            data-play
             disabled={!snapshot?.hasAudio || snapshot?.recording || snapshot?.rendering}
             onClick={onPlayClick}
           >
@@ -642,7 +639,6 @@ const MediaControls = ({
           <Button
             variant="outlined"
             color="neutral"
-            data-record-video
             disabled={!snapshot?.hasVisualMedia || !snapshot?.hasAudio || !!snapshot?.recording || !!snapshot?.rendering}
             onClick={onRecordClick}
           >
@@ -651,16 +647,15 @@ const MediaControls = ({
           <Button
             variant="outlined"
             color="neutral"
-            data-render-video
             disabled={!!snapshot?.recording || !!snapshot?.rendering || !snapshot?.hasVisualMedia || !snapshot?.hasAudio}
             onClick={onRenderClick}
           >
             {snapshot?.rendering ? 'Finalizing...' : 'Render & download'}
           </Button>
           <div className="inline-flex justify-end gap-1.5 text-content-muted tabular-nums">
-            <span data-current-time>{snapshot?.currentTime ?? '00:00'}</span>
+            <span>{snapshot?.currentTime ?? '00:00'}</span>
             <span>/</span>
-            <span data-duration>{snapshot?.duration ?? '00:00'}</span>
+            <span>{snapshot?.duration ?? '00:00'}</span>
           </div>
         </div>
       </div>
@@ -823,14 +818,13 @@ export const App = ({
         <div className="grid grid-cols-[minmax(180px,auto)_minmax(120px,1fr)_auto] gap-3 items-center min-h-[48px] px-3.5 py-2 border-b border-border-subtle">
           <div className="flex gap-3 items-baseline min-w-0">
             <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">Settings</span>
-            <p className="min-w-0 overflow-hidden text-content-muted text-[0.78rem] text-ellipsis whitespace-nowrap m-0 min-h-[1.4em]" data-status>
+            <p className="min-w-0 overflow-hidden text-content-muted text-[0.78rem] text-ellipsis whitespace-nowrap m-0 min-h-[1.4em]">
               {status ?? 'Load image or video and WAV.'}
             </p>
           </div>
           <div className="overflow-hidden h-1.5 min-w-[120px] rounded-full bg-surface-subtle" aria-hidden="true">
             <div
               className="progress-fill"
-              data-progress
               style={{ width: `${snapshot?.progressPercent ?? 0}%` }}
             />
           </div>
