@@ -450,6 +450,7 @@ const VideoRhythmControlsPanel = ({
         Video rhythm
       </h2>
     </div>
+    <div className="flex gap-4 flex-wrap">
     <div className="grid gap-1.5 min-w-0" data-video-rhythm-mode>
       <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">
         Mode
@@ -488,6 +489,7 @@ const VideoRhythmControlsPanel = ({
           })
         }
       />
+    </div>
     </div>
     <div className="slider-row">
       {VIDEO_RHYTHM_CONTROL_FIELDS.map((control) => (
@@ -545,88 +547,101 @@ const MediaControls = ({
   return (
     <section
       id="settings-tab-panel-media"
-      className="settings-tab-panel"
+      className="settings-tab-panel p-4"
       data-settings-tab-panel="media"
       role="tabpanel"
       aria-labelledby="settings-tab-media"
       hidden={hidden}
     >
-      <div className="media-row">
-        <label className="grid gap-1.5 min-w-0">
+      <div className="flex flex-col gap-3">
+        <div className="grid gap-1.5">
           <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">Image / video</span>
-          <input
-            data-image-input
-            type="file"
-            className="w-full border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-muted file:mr-2.5 file:border-0 file:rounded file:py-1.5 file:px-2.5 file:bg-content-primary file:text-[#070707] file:font-bold file:cursor-pointer"
-            accept="image/*,video/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) onImageFileChange?.(file)
-            }}
-          />
-          <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap">
-            {imageFileName ?? 'No visual media'}
-          </small>
-        </label>
-
-        <div className="grid gap-1.5 min-w-0" data-audio-source>
-          <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">Audio source</span>
-          <OptionSelect
-            value={audioSourceMode}
-            options={[
-              { name: 'WAV file', value: 'wav' },
-              { name: 'Audio input', value: 'input' },
-            ]}
-            onChange={(value) => onAudioSourceChange?.(value as AudioSourceMode)}
-          />
+          <div className="flex gap-2 items-center">
+            <label className="cursor-pointer">
+              <input
+                data-image-input
+                type="file"
+                className="border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-muted file:mr-2.5 file:border-0 file:rounded file:py-1.5 file:px-2.5 file:bg-content-primary file:text-[#070707] file:font-bold file:cursor-pointer"
+                accept="image/*,video/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) onImageFileChange?.(file)
+                }}
+              />
+            </label>
+            {imageFileName
+              ? <span className="px-2 py-1 rounded border border-brand/40 bg-brand/10 text-brand text-[0.76rem] font-semibold truncate max-w-[180px]">{imageFileName}</span>
+              : <span className="text-content-muted text-[0.76rem]">No file</span>
+            }
+          </div>
         </div>
 
-        <label
-          className={`grid gap-1.5 min-w-0${isWavFileInputVisible(audioSourceMode) ? '' : ' is-hidden'}`}
-          data-audio-file-field
-        >
-          <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">WAV</span>
-          <input
-            data-audio-input
-            type="file"
-            className="w-full border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-muted file:mr-2.5 file:border-0 file:rounded file:py-1.5 file:px-2.5 file:bg-content-primary file:text-[#070707] file:font-bold file:cursor-pointer"
-            accept=".wav,audio/wav"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) onAudioFileChange?.(file)
-            }}
-          />
-          <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap">
-            {audioFileName ?? 'No audio'}
-          </small>
-        </label>
-
-        <div
-          className={`input-source-field${audioSourceMode === 'input' ? ' is-visible' : ''}`}
-        >
-          <div className="grid gap-1.5 min-w-0" data-audio-device>
-            <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">Input device</span>
+        <div className="flex gap-3 flex-wrap items-start">
+          <div className="grid gap-1.5 min-w-0" data-audio-source>
+            <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">Audio source</span>
             <OptionSelect
-              value={deviceId}
+              value={audioSourceMode}
               options={[
-                { name: 'Default input', value: '' },
-                ...(audioDevices ?? []).map((d) => ({ name: d.label, value: d.id })),
+                { name: 'WAV file', value: 'wav' },
+                { name: 'Audio input', value: 'input' },
               ]}
-              onChange={(value) => setDeviceId(value as string)}
+              onChange={(value) => onAudioSourceChange?.(value as AudioSourceMode)}
             />
           </div>
-          <Button
-            variant="outlined"
-            color="neutral"
-            size="sm"
-            data-audio-input-connect
-            onClick={() => onAudioDeviceConnect?.(deviceId)}
-          >
-            Use input
-          </Button>
-          <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap">
-            {audioInputName ?? 'No input connected'}
-          </small>
+
+          {isWavFileInputVisible(audioSourceMode) && (
+            <div className="grid gap-1.5" data-audio-file-field>
+              <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">WAV file</span>
+              <div className="flex gap-2 items-center">
+                <label className="cursor-pointer">
+                  <input
+                    data-audio-input
+                    type="file"
+                    className="border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-muted file:mr-2.5 file:border-0 file:rounded file:py-1.5 file:px-2.5 file:bg-content-primary file:text-[#070707] file:font-bold file:cursor-pointer"
+                    accept=".wav,audio/wav"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) onAudioFileChange?.(file)
+                    }}
+                  />
+                </label>
+                {audioFileName
+                  ? <span className="px-2 py-1 rounded border border-brand/40 bg-brand/10 text-brand text-[0.76rem] font-semibold truncate max-w-[180px]">{audioFileName}</span>
+                  : <span className="text-content-muted text-[0.76rem]">No file</span>
+                }
+              </div>
+            </div>
+          )}
+
+          {audioSourceMode === 'input' && (
+            <div className="flex gap-2 items-end flex-1 flex-wrap">
+              <div className="grid gap-1.5 min-w-0" data-audio-device>
+                <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">Input device</span>
+                <OptionSelect
+                  value={deviceId}
+                  options={[
+                    { name: 'Default input', value: '' },
+                    ...(audioDevices ?? []).map((d) => ({ name: d.label, value: d.id })),
+                  ]}
+                  onChange={(value) => setDeviceId(value as string)}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Button
+                  variant="outlined"
+                  color="neutral"
+                  size="sm"
+                  data-audio-input-connect
+                  onClick={() => onAudioDeviceConnect?.(deviceId)}
+                >
+                  Use input
+                </Button>
+                <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap">
+                  {audioInputName ?? 'No input connected'}
+                </small>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-[repeat(3,max-content)_minmax(90px,1fr)] gap-2 items-center min-w-[440px]">
@@ -698,7 +713,7 @@ const FilterOrderControls = ({
           Filter order
         </h2>
       </div>
-      <div className="filter-order-grid">
+      <div className="flex flex-col gap-2">
         <FilterOrderItems filterOrder={filterOrder} onMove={handleMove} />
       </div>
     </section>
@@ -824,14 +839,14 @@ export const App = ({
   return (
     <main className="relative min-h-screen overflow-hidden">
       <button
-        className={`settings-toggle w-[86px] h-[34px] grid place-items-center border border-border-subtle border-b-0 rounded-t-[8px] px-0 bg-surface-panel/[0.94] text-content-primary cursor-pointer backdrop-blur-[14px] shadow-[0_-10px_36px_rgba(0,0,0,0.38)]${settingsOpen ? ' is-open' : ''}`}
+        className={`settings-toggle w-[86px] h-[34px] grid place-items-center border border-b-0 rounded-t-[8px] px-0 text-content-primary cursor-pointer backdrop-blur-[14px] shadow-[0_-10px_36px_rgba(0,0,0,0.38)] transition-colors${settingsOpen ? ' is-open border-white/[0.22] bg-black/[0.92]' : ' border-border-subtle bg-surface-panel/[0.94]'}`}
         type="button"
         aria-expanded={settingsOpen}
         aria-controls="settings-panel"
         aria-label={settingsOpen ? 'Hide settings' : 'Show settings'}
         onClick={() => setSettingsOpen((v) => !v)}
       >
-        <span className="relative w-[42px] h-[3px] rounded-full bg-content-muted before:absolute before:content-[''] before:w-full before:h-full before:rounded-full before:bg-content-muted/[0.62] before:-top-[6px] after:absolute after:content-[''] after:w-full after:h-full after:rounded-full after:bg-content-muted/[0.62] after:top-[6px]" aria-hidden />
+        <span className="block w-[42px] h-[3px] rounded-full bg-content-muted" aria-hidden />
       </button>
 
       <aside

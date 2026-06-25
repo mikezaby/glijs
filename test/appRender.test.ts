@@ -22,12 +22,21 @@ test('renders the application shell and controls through React components', () =
   assert.match(markup, /data-audio-source="true"/)
   assert.match(markup, /data-audio-file-field="true"/)
   assert.match(markup, /data-audio-input="true"/)
-  assert.match(markup, /data-audio-device="true"/)
-  assert.match(markup, /data-audio-input-connect="true"/)
   assert.match(markup, /data-video-rhythm-mode="true"/)
   assert.match(markup, /aria-label="Spread"/)
   assert.match(markup, /data-filter-order-item/)
   assert.match(markup, /data-filter-enabled="rgbSplit"/)
+})
+
+test('shows input device controls only in input audio source mode', () => {
+  const wavMarkup = renderToStaticMarkup(React.createElement(App, { audioSourceMode: 'wav' }))
+  assert.doesNotMatch(wavMarkup, /data-audio-device="true"/)
+  assert.doesNotMatch(wavMarkup, /data-audio-input-connect="true"/)
+
+  const inputMarkup = renderToStaticMarkup(React.createElement(App, { audioSourceMode: 'input' }))
+  assert.match(inputMarkup, /data-audio-device="true"/)
+  assert.match(inputMarkup, /data-audio-input-connect="true"/)
+  assert.doesNotMatch(inputMarkup, /data-audio-file-field="true"/)
 })
 
 test('renders bottom settings tabs with one panel for every effect', () => {
