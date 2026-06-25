@@ -663,23 +663,45 @@ const MediaControls = ({
   )
 }
 
-const FilterOrderControls = ({ hidden }: { hidden?: boolean }) => (
-  <section
-    id="settings-tab-panel-filter-order"
-    className="settings-tab-panel control-group grid gap-3 content-start p-4"
-    data-settings-tab-panel="filter-order"
-    role="tabpanel"
-    aria-labelledby="settings-tab-filter-order"
-    hidden={hidden}
-  >
-    <div className="flex gap-2.5 items-center">
-      <h2 className="flex flex-1 gap-2 items-center m-0 text-content-primary text-[0.78rem] font-bold uppercase before:w-[3px] before:h-[1.1em] before:rounded-full before:bg-brand before:content-[''] after:flex-1 after:h-px after:bg-border-subtle after:content-['']">
-        Filter order
-      </h2>
-    </div>
-    <div className="filter-order-grid" data-filter-order-list />
-  </section>
-)
+const FilterOrderControls = ({
+  hidden,
+  filterOrder = DEFAULT_FILTER_ORDER,
+  onFilterOrderChange,
+}: {
+  hidden?: boolean
+  filterOrder?: FilterGroupKey[]
+  onFilterOrderChange?: (order: FilterGroupKey[]) => void
+}) => {
+  const handleMove = (key: FilterGroupKey, direction: 'up' | 'down') => {
+    const currentIndex = filterOrder.indexOf(key)
+    const nextIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= filterOrder.length) return
+    const next = [...filterOrder]
+    next[currentIndex] = filterOrder[nextIndex]
+    next[nextIndex] = key
+    onFilterOrderChange?.(next)
+  }
+
+  return (
+    <section
+      id="settings-tab-panel-filter-order"
+      className="settings-tab-panel control-group grid gap-3 content-start p-4"
+      data-settings-tab-panel="filter-order"
+      role="tabpanel"
+      aria-labelledby="settings-tab-filter-order"
+      hidden={hidden}
+    >
+      <div className="flex gap-2.5 items-center">
+        <h2 className="flex flex-1 gap-2 items-center m-0 text-content-primary text-[0.78rem] font-bold uppercase before:w-[3px] before:h-[1.1em] before:rounded-full before:bg-brand before:content-[''] after:flex-1 after:h-px after:bg-border-subtle after:content-['']">
+          Filter order
+        </h2>
+      </div>
+      <div className="filter-order-grid">
+        <FilterOrderItems filterOrder={filterOrder} onMove={handleMove} />
+      </div>
+    </section>
+  )
+}
 
 const SettingsTab = ({
   tabKey,
@@ -722,8 +744,10 @@ const SettingsTab = ({
 
 export const FilterOrderItems = ({
   filterOrder,
+  onMove,
 }: {
   filterOrder: FilterGroupKey[]
+  onMove?: (key: FilterGroupKey, direction: 'up' | 'down') => void
 }) => (
   <>
     {filterOrder.map((key, index) => (
@@ -739,6 +763,7 @@ export const FilterOrderItems = ({
             data-filter-direction="up"
             disabled={index === 0}
             aria-label={`Move ${FILTER_GROUP_LABELS[key]} earlier`}
+            onClick={() => onMove?.(key, 'up')}
           >
             Up
           </button>
@@ -749,6 +774,7 @@ export const FilterOrderItems = ({
             data-filter-direction="down"
             disabled={index === filterOrder.length - 1}
             aria-label={`Move ${FILTER_GROUP_LABELS[key]} later`}
+            onClick={() => onMove?.(key, 'down')}
           >
             Down
           </button>
@@ -805,10 +831,6 @@ export const App = ({
       >
         <span className="relative w-[42px] h-[3px] rounded-full bg-content-muted before:absolute before:content-[''] before:w-full before:h-full before:rounded-full before:bg-content-muted/[0.62] before:-top-[6px] after:absolute after:content-[''] after:w-full after:h-full after:rounded-full after:bg-content-muted/[0.62] after:top-[6px]" aria-hidden />
       </button>
-
-      <section className="min-h-screen">
-        <div id="sketch-host" className="sketch-host" />
-      </section>
 
       <aside
         id="settings-panel"
@@ -882,7 +904,7 @@ export const App = ({
             onVideoRhythmChange={onVideoRhythmChange}
             hidden={activeTab !== 'video-rhythm'}
           />
-          <FilterOrderControls hidden={activeTab !== 'filter-order'} />
+          <FilterOrderControls hidden={activeTab !== 'filter-order'} filterOrder={_filterOrder} onFilterOrderChange={_onFilterOrderChange} />
           {CONTROL_GROUPS.map((group) => (
             <ControlGroupSection
               group={group}

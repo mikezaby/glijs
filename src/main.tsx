@@ -1,12 +1,11 @@
 import './styles/index.css'
 import { flushSync } from 'react-dom'
-import { createRoot, type Root } from 'react-dom/client'
+import { createRoot } from 'react-dom/client'
 
 import {
   App,
   CONTROL_KEYS,
   DEFAULT_BLOCK_CONTROLS,
-  FilterOrderItems,
   type AppProps,
   type AudioDeviceOption,
   type SketchUISnapshot,
@@ -72,10 +71,6 @@ const rerenderApp = () => {
 }
 
 const sketchHost = document.querySelector<HTMLElement>('#sketch-host')!
-const filterOrderList = document.querySelector<HTMLElement>(
-  '[data-filter-order-list]',
-)!
-const filterOrderRoot: Root = createRoot(filterOrderList)
 
 let filterOrder: FilterGroupKey[] = [...DEFAULT_FILTER_ORDER]
 let filterGroupState: FilterGroupState = { ...DEFAULT_FILTER_GROUP_STATE }
@@ -133,12 +128,6 @@ const computeStatus = (snapshot: ReturnType<typeof sketch.getSnapshot>): string 
   return snapshot.playing ? 'Playing.' : 'Ready.'
 }
 
-const renderFilterOrder = () => {
-  flushSync(() => {
-    filterOrderRoot.render(<FilterOrderItems filterOrder={filterOrder} />)
-  })
-}
-
 const applyFilterOrder = (nextOrder: FilterGroupKey[]) => {
   const ordered = nextOrder.filter((key, index) => {
     return DEFAULT_FILTER_ORDER.includes(key) && nextOrder.indexOf(key) === index
@@ -148,7 +137,6 @@ const applyFilterOrder = (nextOrder: FilterGroupKey[]) => {
   filterOrder = [...ordered, ...missing]
   sketch.setFilterOrder(filterOrder)
   saveStoredFilterOrder(filterOrder)
-  renderFilterOrder()
 }
 
 const applyFilterGroupState = (nextState: FilterGroupState) => {
@@ -333,32 +321,6 @@ appProps.onRenderClick = async () => {
   }
 }
 
-filterOrderList.addEventListener('click', (event) => {
-  const target = event.target
-
-  if (!(target instanceof HTMLButtonElement)) {
-    return
-  }
-
-  const key = target.dataset.filterMove as FilterGroupKey | undefined
-  const direction = target.dataset.filterDirection
-
-  if (!key || !DEFAULT_FILTER_ORDER.includes(key)) {
-    return
-  }
-
-  const currentIndex = filterOrder.indexOf(key)
-  const nextIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
-
-  if (currentIndex < 0 || nextIndex < 0 || nextIndex >= filterOrder.length) {
-    return
-  }
-
-  const nextOrder = [...filterOrder]
-  nextOrder[currentIndex] = filterOrder[nextIndex]
-  nextOrder[nextIndex] = key
-  applyFilterOrder(nextOrder)
-})
 
 const animateUi = () => {
   syncUi()

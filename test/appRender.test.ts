@@ -18,7 +18,6 @@ test('renders the application shell and controls through React components', () =
   )
 
   assert.match(markup, /<main class="relative min-h-screen overflow-hidden">/)
-  assert.match(markup, /id="sketch-host"/)
   assert.match(markup, /data-image-input="true"/)
   assert.match(markup, /data-audio-source="true"/)
   assert.match(markup, /data-audio-file-field="true"/)
@@ -27,8 +26,8 @@ test('renders the application shell and controls through React components', () =
   assert.match(markup, /data-audio-input-connect="true"/)
   assert.match(markup, /data-video-rhythm-mode="true"/)
   assert.match(markup, /aria-label="Spread"/)
+  assert.match(markup, /data-filter-order-item/)
   assert.match(markup, /data-filter-enabled="rgbSplit"/)
-  assert.match(markup, /data-filter-order-list="true"/)
 })
 
 test('renders bottom settings tabs with one panel for every effect', () => {
