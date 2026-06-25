@@ -1,10 +1,20 @@
+import { useState } from 'react'
+import type { AudioSourceMode } from './audioSource'
+import { isWavFileInputVisible } from './audioSource'
 import type {
   BlockControls,
   FilterGroupKey,
+  FilterGroupState,
+} from './glitchSketch'
+import {
+  DEFAULT_FILTER_GROUP_STATE,
+  DEFAULT_FILTER_ORDER,
 } from './glitchSketch'
 import {
   DEFAULT_VIDEO_RHYTHM_CONTROLS,
   type VideoRhythmControls,
+  type VideoRhythmMode,
+  type VideoRhythmShape,
 } from './videoRhythm'
 
 export { DEFAULT_FILTER_ORDER } from './glitchSketch'
@@ -257,6 +267,45 @@ export const VIDEO_RHYTHM_CONTROL_FIELDS: Array<{
   },
 ]
 
+export type AudioDeviceOption = { id: string; label: string }
+
+export type SketchUISnapshot = {
+  playing: boolean
+  recording: boolean
+  rendering: boolean
+  hasAudio: boolean
+  hasVisualMedia: boolean
+  currentTime: string
+  duration: string
+  progressPercent: number
+}
+
+export interface AppProps {
+  blockControls?: BlockControls
+  filterGroupState?: FilterGroupState
+  filterOrder?: FilterGroupKey[]
+  videoRhythmControls?: VideoRhythmControls
+  audioSourceMode?: AudioSourceMode
+  audioDevices?: AudioDeviceOption[]
+  imageFileName?: string
+  audioFileName?: string
+  audioInputName?: string
+  lastBackdropIntensity?: number
+  snapshot?: SketchUISnapshot
+  status?: string
+  onControlChange?: (key: ControlKey, value: number) => void
+  onFilterGroupStateChange?: (key: FilterGroupKey, enabled: boolean, solo: boolean) => void
+  onFilterOrderChange?: (order: FilterGroupKey[]) => void
+  onVideoRhythmChange?: (controls: VideoRhythmControls) => void
+  onAudioSourceChange?: (mode: AudioSourceMode) => void
+  onAudioDeviceConnect?: (deviceId: string) => void
+  onImageFileChange?: (file: File) => void
+  onAudioFileChange?: (file: File) => void
+  onPlayClick?: () => void
+  onRecordClick?: () => void
+  onRenderClick?: () => void
+}
+
 export const InfoTooltip = ({ text }: { text: string }) => (
   <span
     className="info-tooltip"
@@ -273,9 +322,17 @@ export const InfoTooltip = ({ text }: { text: string }) => (
 const ControlGroupSection = ({
   group,
   active,
+  blockControls,
+  filterGroupState,
+  onControlChange,
+  onFilterGroupStateChange,
 }: {
   group: ControlGroup
   active: boolean
+  blockControls: BlockControls
+  filterGroupState: FilterGroupState
+  onControlChange?: AppProps['onControlChange']
+  onFilterGroupStateChange?: AppProps['onFilterGroupStateChange']
 }) => {
   const tabKey = getControlGroupTabKey(group)
 
@@ -297,19 +354,41 @@ const ControlGroupSection = ({
             <input
               data-filter-enabled={group.filterKey}
               type="checkbox"
-              defaultChecked
+              checked={filterGroupState[group.filterKey]?.enabled ?? true}
+              onChange={(e) =>
+                onFilterGroupStateChange?.(
+                  group.filterKey!,
+                  e.target.checked,
+                  filterGroupState[group.filterKey!]?.solo ?? false,
+                )
+              }
             />
             <span>Enable</span>
           </label>
           <label className="toggle-field toggle-field--solo">
-            <input data-filter-solo={group.filterKey} type="checkbox" />
+            <input
+              data-filter-solo={group.filterKey}
+              type="checkbox"
+              checked={filterGroupState[group.filterKey]?.solo ?? false}
+              onChange={(e) =>
+                onFilterGroupStateChange?.(
+                  group.filterKey!,
+                  filterGroupState[group.filterKey!]?.enabled ?? true,
+                  e.target.checked,
+                )
+              }
+            />
             <span>Solo</span>
           </label>
         </div>
       ) : (
         <div className="filter-toggles" aria-label={`${group.name} effect controls`}>
           <label className="toggle-field">
-            <input data-backdrop-enabled type="checkbox" defaultChecked />
+            <input
+              data-backdrop-enabled
+              type="checkbox"
+              defaultChecked
+            />
             <span>Enable</span>
           </label>
         </div>
@@ -324,7 +403,7 @@ const ControlGroupSection = ({
               <InfoTooltip text={control.title} />
             </span>
             <strong data-control-value={control.key}>
-              {DEFAULT_BLOCK_CONTROLS[control.key]}%
+              {blockControls[control.key]}%
             </strong>
           </div>
           <input
@@ -332,7 +411,8 @@ const ControlGroupSection = ({
             type="range"
             min="0"
             max="100"
-            defaultValue={DEFAULT_BLOCK_CONTROLS[control.key]}
+            defaultValue={blockControls[control.key]}
+            onChange={(e) => onControlChange?.(control.key, Number(e.target.value))}
           />
         </label>
       ))}
@@ -341,7 +421,13 @@ const ControlGroupSection = ({
   )
 }
 
-const VideoRhythmControls = () => (
+const VideoRhythmControlsPanel = ({
+  videoRhythmControls,
+  onVideoRhythmChange,
+}: {
+  videoRhythmControls: VideoRhythmControls
+  onVideoRhythmChange?: AppProps['onVideoRhythmChange']
+}) => (
   <section
     id="settings-tab-panel-video-rhythm"
     className="settings-tab-panel control-group"
@@ -361,7 +447,13 @@ const VideoRhythmControls = () => (
         Mode
         <InfoTooltip text="Controls how video time reacts to the WAV analysis." />
       </span>
-      <select data-video-rhythm-mode defaultValue="normal">
+      <select
+        data-video-rhythm-mode
+        value={videoRhythmControls.mode}
+        onChange={(e) =>
+          onVideoRhythmChange?.({ ...videoRhythmControls, mode: e.target.value as VideoRhythmMode })
+        }
+      >
         <option value="normal">Normal playback</option>
         <option value="seek">Rhythm seek</option>
         <option value="multi">Multi-seek slices</option>
@@ -375,7 +467,13 @@ const VideoRhythmControls = () => (
         Shape
         <InfoTooltip text="Controls the visual structure used by multi-seek mode." />
       </span>
-      <select data-video-rhythm-shape defaultValue="cubes">
+      <select
+        data-video-rhythm-shape
+        value={videoRhythmControls.shape}
+        onChange={(e) =>
+          onVideoRhythmChange?.({ ...videoRhythmControls, shape: e.target.value as VideoRhythmShape })
+        }
+      >
         <option value="strips">Strips</option>
         <option value="cubes">Cubes</option>
       </select>
@@ -389,7 +487,7 @@ const VideoRhythmControls = () => (
               <InfoTooltip text={control.title} />
             </span>
             <strong data-video-rhythm-value={control.key}>
-              {DEFAULT_VIDEO_RHYTHM_CONTROLS[control.key]}
+              {videoRhythmControls[control.key]}
             </strong>
           </div>
           <input
@@ -397,7 +495,10 @@ const VideoRhythmControls = () => (
             type="range"
             min={control.min}
             max={control.max}
-            defaultValue={DEFAULT_VIDEO_RHYTHM_CONTROLS[control.key]}
+            defaultValue={videoRhythmControls[control.key]}
+            onChange={(e) =>
+              onVideoRhythmChange?.({ ...videoRhythmControls, [control.key]: Number(e.target.value) })
+            }
           />
         </label>
       ))}
@@ -405,85 +506,155 @@ const VideoRhythmControls = () => (
   </section>
 )
 
-const MediaControls = () => (
-  <section
-    id="settings-tab-panel-media"
-    className="settings-tab-panel"
-    data-settings-tab-panel="media"
-    role="tabpanel"
-    aria-labelledby="settings-tab-media"
-    hidden
-  >
-    <div className="settings-row media-row">
-      <label className="file-field">
-        <span>Image / video</span>
-        <input data-image-input type="file" accept="image/*,video/*" />
-        <small data-image-name>No visual media</small>
-      </label>
+const MediaControls = ({
+  audioSourceMode,
+  audioDevices,
+  imageFileName,
+  audioFileName,
+  audioInputName,
+  snapshot,
+  onAudioSourceChange,
+  onAudioDeviceConnect,
+  onImageFileChange,
+  onAudioFileChange,
+  onPlayClick,
+  onRecordClick,
+  onRenderClick,
+}: {
+  audioSourceMode: AudioSourceMode
+  audioDevices: AudioDeviceOption[]
+  imageFileName?: string
+  audioFileName?: string
+  audioInputName?: string
+  snapshot?: SketchUISnapshot
+  onAudioSourceChange?: AppProps['onAudioSourceChange']
+  onAudioDeviceConnect?: AppProps['onAudioDeviceConnect']
+  onImageFileChange?: AppProps['onImageFileChange']
+  onAudioFileChange?: AppProps['onAudioFileChange']
+  onPlayClick?: AppProps['onPlayClick']
+  onRecordClick?: AppProps['onRecordClick']
+  onRenderClick?: AppProps['onRenderClick']
+}) => {
+  const [deviceId, setDeviceId] = useState('')
 
-      <label
-        className="select-field"
-        title="Select whether the visuals react to a WAV file or a live OS audio input."
-      >
-        <span>Audio source</span>
-        <select data-audio-source defaultValue="wav">
-          <option value="wav">WAV file</option>
-          <option value="input">Audio input</option>
-        </select>
-      </label>
+  return (
+    <section
+      id="settings-tab-panel-media"
+      className="settings-tab-panel"
+      data-settings-tab-panel="media"
+      role="tabpanel"
+      aria-labelledby="settings-tab-media"
+      hidden
+    >
+      <div className="settings-row media-row">
+        <label className="file-field">
+          <span>Image / video</span>
+          <input
+            data-image-input
+            type="file"
+            accept="image/*,video/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) onImageFileChange?.(file)
+            }}
+          />
+          <small data-image-name>{imageFileName ?? 'No visual media'}</small>
+        </label>
 
-      <label className="file-field" data-audio-file-field>
-        <span>WAV</span>
-        <input data-audio-input type="file" accept=".wav,audio/wav" />
-        <small data-audio-name>No audio</small>
-      </label>
-
-      <div className="input-source-field" data-audio-input-controls>
-        <label className="select-field">
-          <span>Input device</span>
-          <select data-audio-device>
-            <option value="">Default input</option>
+        <label
+          className="select-field"
+          title="Select whether the visuals react to a WAV file or a live OS audio input."
+        >
+          <span>Audio source</span>
+          <select
+            data-audio-source
+            value={audioSourceMode}
+            onChange={(e) => onAudioSourceChange?.(e.target.value as AudioSourceMode)}
+          >
+            <option value="wav">WAV file</option>
+            <option value="input">Audio input</option>
           </select>
         </label>
-        <button
-          data-audio-input-connect
-          type="button"
-          className="transport__button transport__button--secondary"
-        >
-          Use input
-        </button>
-        <small data-audio-input-name>No input connected</small>
-      </div>
 
-      <div className="transport">
-        <button data-play type="button" className="transport__button" disabled>
-          Play
-        </button>
-        <button
-          data-record-video
-          type="button"
-          className="transport__button transport__button--secondary"
-          disabled
+        <label
+          className={`file-field${isWavFileInputVisible(audioSourceMode) ? '' : ' is-hidden'}`}
+          data-audio-file-field
         >
-          Record video
-        </button>
-        <button
-          data-render-video
-          type="button"
-          className="transport__button transport__button--secondary"
-          disabled
+          <span>WAV</span>
+          <input
+            data-audio-input
+            type="file"
+            accept=".wav,audio/wav"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) onAudioFileChange?.(file)
+            }}
+          />
+          <small data-audio-name>{audioFileName ?? 'No audio'}</small>
+        </label>
+
+        <div
+          className={`input-source-field${audioSourceMode === 'input' ? ' is-visible' : ''}`}
+          data-audio-input-controls
         >
-          Render &amp; download
-        </button>
-        <div className="transport__time">
-          <span data-current-time>00:00</span>
-          <span>/</span>
-          <span data-duration>00:00</span>
+          <label className="select-field">
+            <span>Input device</span>
+            <select data-audio-device value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
+              <option value="">Default input</option>
+              {audioDevices.map((d) => (
+                <option key={d.id} value={d.id}>{d.label}</option>
+              ))}
+            </select>
+          </label>
+          <button
+            data-audio-input-connect
+            type="button"
+            className="transport__button transport__button--secondary"
+            onClick={() => onAudioDeviceConnect?.(deviceId)}
+          >
+            Use input
+          </button>
+          <small data-audio-input-name>{audioInputName ?? 'No input connected'}</small>
+        </div>
+
+        <div className="transport">
+          <button
+            data-play
+            type="button"
+            className="transport__button"
+            disabled={!snapshot?.hasAudio || snapshot?.recording}
+            onClick={onPlayClick}
+          >
+            {snapshot?.playing ? 'Pause' : 'Play'}
+          </button>
+          <button
+            data-record-video
+            type="button"
+            className="transport__button transport__button--secondary"
+            disabled={!snapshot?.hasAudio || !snapshot?.hasVisualMedia || snapshot?.rendering}
+            onClick={onRecordClick}
+          >
+            {snapshot?.recording ? 'Stop & download' : 'Record video'}
+          </button>
+          <button
+            data-render-video
+            type="button"
+            className="transport__button transport__button--secondary"
+            disabled={!snapshot?.hasAudio || !snapshot?.hasVisualMedia || snapshot?.recording}
+            onClick={onRenderClick}
+          >
+            Render &amp; download
+          </button>
+          <div className="transport__time">
+            <span data-current-time>{snapshot?.currentTime ?? '00:00'}</span>
+            <span>/</span>
+            <span data-duration>{snapshot?.duration ?? '00:00'}</span>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
-)
+    </section>
+  )
+}
 
 const FilterOrderControls = () => (
   <section
@@ -560,78 +731,129 @@ export const FilterOrderItems = ({
   </>
 )
 
-export const App = () => (
-  <main className="shell">
-    <button
-      data-settings-toggle
-      className="settings-toggle is-open"
-      type="button"
-      aria-expanded="true"
-      aria-controls="settings-panel"
-      aria-label="Hide settings"
-    >
-      <span className="settings-toggle__grip" aria-hidden="true" />
-    </button>
+export const App = ({
+  blockControls = DEFAULT_BLOCK_CONTROLS,
+  filterGroupState = DEFAULT_FILTER_GROUP_STATE,
+  filterOrder: _filterOrder = DEFAULT_FILTER_ORDER,
+  videoRhythmControls = DEFAULT_VIDEO_RHYTHM_CONTROLS,
+  audioSourceMode = 'wav',
+  audioDevices = [],
+  imageFileName,
+  audioFileName,
+  audioInputName,
+  lastBackdropIntensity: _lastBackdropIntensity = DEFAULT_BLOCK_CONTROLS.backdropIntensity,
+  snapshot,
+  status,
+  onControlChange,
+  onFilterGroupStateChange,
+  onFilterOrderChange: _onFilterOrderChange,
+  onVideoRhythmChange,
+  onAudioSourceChange,
+  onAudioDeviceConnect,
+  onImageFileChange,
+  onAudioFileChange,
+  onPlayClick,
+  onRecordClick,
+  onRenderClick,
+}: AppProps) => {
+  return (
+    <main className="shell">
+      <button
+        data-settings-toggle
+        className="settings-toggle is-open"
+        type="button"
+        aria-expanded="true"
+        aria-controls="settings-panel"
+        aria-label="Hide settings"
+      >
+        <span className="settings-toggle__grip" aria-hidden="true" />
+      </button>
 
-    <section className="stage">
-      <div id="sketch-host" className="sketch-host" />
-    </section>
+      <section className="stage">
+        <div id="sketch-host" className="sketch-host" />
+      </section>
 
-    <aside
-      id="settings-panel"
-      className="settings is-open"
-      aria-label="Visual settings"
-    >
-      <div className="settings__header">
-        <div className="settings__title">
-          <span>Settings</span>
-          <p className="status" data-status>
-            Load image or video and WAV.
-          </p>
-        </div>
-        <div className="progress" aria-hidden="true">
-          <div className="progress__fill" data-progress />
-        </div>
-        <button
-          data-settings-close
-          className="settings__close"
-          type="button"
-          aria-label="Hide settings"
-        >
-          Close
-        </button>
-      </div>
-
-      <div className="settings-tabs" data-settings-tabs role="tablist">
-        <SettingsTab tabKey="media" label="Media" />
-        <SettingsTab tabKey="video-rhythm" label="Video rhythm" />
-        <SettingsTab tabKey="filter-order" label="Filter order" />
-        {CONTROL_GROUPS.map((group) => {
-          const tabKey = getControlGroupTabKey(group)
-
-          return (
-            <SettingsTab
-              tabKey={tabKey}
-              label={group.name}
-              active={tabKey === DEFAULT_SETTINGS_TAB}
-              key={tabKey}
+      <aside
+        id="settings-panel"
+        className="settings is-open"
+        aria-label="Visual settings"
+      >
+        <div className="settings__header">
+          <div className="settings__title">
+            <span>Settings</span>
+            <p className="status" data-status>
+              {status ?? 'Load image or video and WAV.'}
+            </p>
+          </div>
+          <div className="progress" aria-hidden="true">
+            <div
+              className="progress__fill"
+              data-progress
+              style={{ width: `${snapshot?.progressPercent ?? 0}%` }}
             />
-          )
-        })}
-      </div>
+          </div>
+          <button
+            data-settings-close
+            className="settings__close"
+            type="button"
+            aria-label="Hide settings"
+          >
+            Close
+          </button>
+        </div>
 
-      <div className="settings-tab-panels">
-        <MediaControls />
-        <VideoRhythmControls />
-        <FilterOrderControls />
-        {CONTROL_GROUPS.map((group) => (
-          <ControlGroupSection
-            group={group}
-            active={getControlGroupTabKey(group) === DEFAULT_SETTINGS_TAB}
-            key={group.name}
+        <div className="settings-tabs" data-settings-tabs role="tablist">
+          <SettingsTab tabKey="media" label="Media" />
+          <SettingsTab tabKey="video-rhythm" label="Video rhythm" />
+          <SettingsTab tabKey="filter-order" label="Filter order" />
+          {CONTROL_GROUPS.map((group) => {
+            const tabKey = getControlGroupTabKey(group)
+
+            return (
+              <SettingsTab
+                tabKey={tabKey}
+                label={group.name}
+                active={tabKey === DEFAULT_SETTINGS_TAB}
+                key={tabKey}
+              />
+            )
+          })}
+        </div>
+
+        <div className="settings-tab-panels">
+          <MediaControls
+            audioSourceMode={audioSourceMode}
+            audioDevices={audioDevices}
+            imageFileName={imageFileName}
+            audioFileName={audioFileName}
+            audioInputName={audioInputName}
+            snapshot={snapshot}
+            onAudioSourceChange={onAudioSourceChange}
+            onAudioDeviceConnect={onAudioDeviceConnect}
+            onImageFileChange={onImageFileChange}
+            onAudioFileChange={onAudioFileChange}
+            onPlayClick={onPlayClick}
+            onRecordClick={onRecordClick}
+            onRenderClick={onRenderClick}
           />
-        ))}
-      </div>
-    </aside>
-  </main>
-)
+          <VideoRhythmControlsPanel
+            videoRhythmControls={videoRhythmControls}
+            onVideoRhythmChange={onVideoRhythmChange}
+          />
+          <FilterOrderControls />
+          {CONTROL_GROUPS.map((group) => (
+            <ControlGroupSection
+              group={group}
+              active={getControlGroupTabKey(group) === DEFAULT_SETTINGS_TAB}
+              key={group.name}
+              blockControls={blockControls}
+              filterGroupState={filterGroupState}
+              onControlChange={onControlChange}
+              onFilterGroupStateChange={onFilterGroupStateChange}
+            />
+          ))}
+        </div>
+      </aside>
+    </main>
+  )
+}
