@@ -1,4 +1,4 @@
-import { Fader, Switch } from '@blibliki/ui'
+import { Button, Fader, OptionSelect, Switch } from '@blibliki/ui'
 import { useState } from 'react'
 import type { AudioSourceMode } from './audioSource'
 import { isWavFileInputVisible } from './audioSource'
@@ -448,47 +448,45 @@ const VideoRhythmControlsPanel = ({
         Video rhythm
       </h2>
     </div>
-    <label
-      className="grid gap-1.5 min-w-0"
-      title="Controls how video time reacts to the WAV analysis."
-    >
+    <div className="grid gap-1.5 min-w-0" data-video-rhythm-mode>
       <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">
         Mode
         <InfoTooltip text="Controls how video time reacts to the WAV analysis." />
       </span>
-      <select
-        className="w-full border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-primary"
-        data-video-rhythm-mode
+      <OptionSelect
         value={videoRhythmControls.mode}
-        onChange={(e) =>
-          onVideoRhythmChange?.({ ...videoRhythmControls, mode: e.target.value as VideoRhythmMode })
+        options={[
+          { name: 'Normal playback', value: 'normal' },
+          { name: 'Rhythm seek', value: 'seek' },
+          { name: 'Multi-seek slices', value: 'multi' },
+        ]}
+        onChange={(value) =>
+          onVideoRhythmChange?.({
+            ...videoRhythmControls,
+            mode: value as VideoRhythmMode,
+          })
         }
-      >
-        <option value="normal">Normal playback</option>
-        <option value="seek">Rhythm seek</option>
-        <option value="multi">Multi-seek slices</option>
-      </select>
-    </label>
-    <label
-      className="grid gap-1.5 min-w-0"
-      title="Controls the visual structure used by multi-seek mode."
-    >
+      />
+    </div>
+    <div className="grid gap-1.5 min-w-0">
       <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">
         Shape
         <InfoTooltip text="Controls the visual structure used by multi-seek mode." />
       </span>
-      <select
-        className="w-full border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-primary"
-        data-video-rhythm-shape
+      <OptionSelect
         value={videoRhythmControls.shape}
-        onChange={(e) =>
-          onVideoRhythmChange?.({ ...videoRhythmControls, shape: e.target.value as VideoRhythmShape })
+        options={[
+          { name: 'Strips', value: 'strips' },
+          { name: 'Cubes', value: 'cubes' },
+        ]}
+        onChange={(value) =>
+          onVideoRhythmChange?.({
+            ...videoRhythmControls,
+            shape: value as VideoRhythmShape,
+          })
         }
-      >
-        <option value="strips">Strips</option>
-        <option value="cubes">Cubes</option>
-      </select>
-    </label>
+      />
+    </div>
     <div className="slider-row">
       {VIDEO_RHYTHM_CONTROL_FIELDS.map((control) => (
         <Fader
@@ -566,21 +564,17 @@ const MediaControls = ({
           </small>
         </label>
 
-        <label
-          className="grid gap-1.5 min-w-0"
-          title="Select whether the visuals react to a WAV file or a live OS audio input."
-        >
+        <div className="grid gap-1.5 min-w-0" data-audio-source>
           <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">Audio source</span>
-          <select
-            className="w-full border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-primary"
-            data-audio-source
+          <OptionSelect
             value={audioSourceMode}
-            onChange={(e) => onAudioSourceChange?.(e.target.value as AudioSourceMode)}
-          >
-            <option value="wav">WAV file</option>
-            <option value="input">Audio input</option>
-          </select>
-        </label>
+            options={[
+              { name: 'WAV file', value: 'wav' },
+              { name: 'Audio input', value: 'input' },
+            ]}
+            onChange={(value) => onAudioSourceChange?.(value as AudioSourceMode)}
+          />
+        </div>
 
         <label
           className={`grid gap-1.5 min-w-0${isWavFileInputVisible(audioSourceMode) ? '' : ' is-hidden'}`}
@@ -606,61 +600,59 @@ const MediaControls = ({
           className={`input-source-field${audioSourceMode === 'input' ? ' is-visible' : ''}`}
           data-audio-input-controls
         >
-          <label className="grid gap-1.5 min-w-0">
+          <div className="grid gap-1.5 min-w-0" data-audio-device>
             <span className="text-content-primary text-[0.82rem] uppercase tracking-[0.08em]">Input device</span>
-            <select
-              className="w-full border border-border-subtle rounded-md p-2.5 bg-surface-panel text-content-primary"
-              data-audio-device
+            <OptionSelect
               value={deviceId}
-              onChange={(e) => setDeviceId(e.target.value)}
-            >
-              <option value="">Default input</option>
-              {audioDevices.map((d) => (
-                <option key={d.id} value={d.id}>{d.label}</option>
-              ))}
-            </select>
-          </label>
-          <button
+              options={[
+                { name: 'Default input', value: '' },
+                ...(audioDevices ?? []).map((d) => ({ name: d.label, value: d.id })),
+              ]}
+              onChange={(value) => setDeviceId(value as string)}
+            />
+          </div>
+          <Button
+            variant="outlined"
+            color="neutral"
+            size="sm"
             data-audio-input-connect
-            type="button"
-            className="border border-border-subtle rounded-md px-[18px] py-2.5 bg-surface-subtle text-content-primary font-extrabold cursor-pointer disabled:cursor-not-allowed disabled:opacity-[0.42]"
             onClick={() => onAudioDeviceConnect?.(deviceId)}
           >
             Use input
-          </button>
+          </Button>
           <small className="min-w-0 overflow-hidden text-content-muted text-ellipsis whitespace-nowrap" data-audio-input-name>
             {audioInputName ?? 'No input connected'}
           </small>
         </div>
 
         <div className="grid grid-cols-[repeat(3,max-content)_minmax(90px,1fr)] gap-2 items-center min-w-[440px]">
-          <button
+          <Button
+            variant="contained"
+            color="primary"
             data-play
-            type="button"
-            className="border-0 rounded-md px-[18px] py-2.5 bg-brand text-[#050505] font-extrabold cursor-pointer disabled:cursor-not-allowed disabled:opacity-[0.42]"
-            disabled={!snapshot?.hasAudio || snapshot?.recording}
+            disabled={!snapshot?.hasAudio || snapshot?.recording || snapshot?.rendering}
             onClick={onPlayClick}
           >
             {snapshot?.playing ? 'Pause' : 'Play'}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outlined"
+            color="neutral"
             data-record-video
-            type="button"
-            className="border border-border-subtle rounded-md px-[18px] py-2.5 bg-surface-subtle text-content-primary font-extrabold cursor-pointer disabled:cursor-not-allowed disabled:opacity-[0.42]"
-            disabled={!snapshot?.hasAudio || !snapshot?.hasVisualMedia || snapshot?.rendering}
+            disabled={!snapshot?.hasVisualMedia || !snapshot?.hasAudio || !!snapshot?.recording || !!snapshot?.rendering}
             onClick={onRecordClick}
           >
             {snapshot?.recording ? 'Stop & download' : 'Record video'}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outlined"
+            color="neutral"
             data-render-video
-            type="button"
-            className="border border-border-subtle rounded-md px-[18px] py-2.5 bg-surface-subtle text-content-primary font-extrabold cursor-pointer disabled:cursor-not-allowed disabled:opacity-[0.42]"
-            disabled={!snapshot?.hasAudio || !snapshot?.hasVisualMedia || snapshot?.recording}
+            disabled={!!snapshot?.recording || !!snapshot?.rendering || !snapshot?.hasVisualMedia || !snapshot?.hasAudio}
             onClick={onRenderClick}
           >
-            Render &amp; download
-          </button>
+            {snapshot?.rendering ? 'Finalizing...' : 'Render & download'}
+          </Button>
           <div className="inline-flex justify-end gap-1.5 text-content-muted tabular-nums">
             <span data-current-time>{snapshot?.currentTime ?? '00:00'}</span>
             <span>/</span>
@@ -812,14 +804,16 @@ export const App = ({
               style={{ width: `${snapshot?.progressPercent ?? 0}%` }}
             />
           </div>
-          <button
-            data-settings-close
-            className="border border-border-subtle rounded-md px-2.5 py-[7px] bg-surface-panel text-content-muted cursor-pointer"
+          <Button
+            variant="outlined"
+            color="neutral"
+            size="sm"
             type="button"
             aria-label="Hide settings"
+            data-settings-close
           >
             Close
-          </button>
+          </Button>
         </div>
 
         <div className="flex gap-1 overflow-x-auto px-3.5 pt-2 pb-0 border-b border-border-subtle [scrollbar-width:thin]" data-settings-tabs role="tablist">
