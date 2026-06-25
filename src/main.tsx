@@ -1,4 +1,4 @@
-import './style.css'
+import './styles/index.css'
 import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 
@@ -55,12 +55,24 @@ import {
   type VideoRhythmMode,
   type VideoRhythmShape,
 } from './videoRhythm'
+import { UIProvider, themeToCssVariables } from '@blibliki/ui'
+import { glijsUITheme } from './theme/uiTheme'
+
+document.documentElement.classList.add('dark')
+const cssVars = themeToCssVariables(glijsUITheme, 'dark')
+for (const [name, value] of Object.entries(cssVars)) {
+  document.documentElement.style.setProperty(name, value)
+}
 
 const appHost = document.querySelector<HTMLDivElement>('#app')!
 const appRoot = createRoot(appHost)
 
 flushSync(() => {
-  appRoot.render(<App />)
+  appRoot.render(
+    <UIProvider mode="dark" theme={glijsUITheme}>
+      <App />
+    </UIProvider>
+  )
 })
 
 const settingsPanel = document.querySelector<HTMLElement>('#settings-panel')!
