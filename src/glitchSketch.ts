@@ -216,7 +216,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     }
 
     instance.draw = () => {
-      resizeIfNeeded(instance, options.host)
+      resizeIfNeeded(instance, options.host, mediaRecorder?.state === 'recording')
       metrics = readMetrics()
       const audioTime = getAudioTime()
 
@@ -852,6 +852,12 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       recorderDestinationConnected = true
     }
 
+    // Size the canvas to fullscreen before capturing so the recording starts at
+    // a stable resolution regardless of the settings panel state.
+    if (sketchInstance) {
+      resizeIfNeeded(sketchInstance, options.host, true)
+    }
+
     const canvasStream = canvasElement.captureStream(30)
     const audioTracks = recorderDestination.stream.getAudioTracks()
     const stream = new MediaStream([
@@ -1149,9 +1155,11 @@ const getSupportedVideoMimeType = () => {
   )
 }
 
-const resizeIfNeeded = (instance: p5, host: HTMLElement) => {
-  const nextWidth = optionsSafeDimension(host.clientWidth)
-  const nextHeight = optionsSafeDimension(host.clientHeight)
+const resizeIfNeeded = (instance: p5, host: HTMLElement, recording = false) => {
+  // ponytail: while recording, pin to the full window so toggling the settings
+  // panel (which shrinks the host) can't change the output video resolution.
+  const nextWidth = optionsSafeDimension(recording ? window.innerWidth : host.clientWidth)
+  const nextHeight = optionsSafeDimension(recording ? window.innerHeight : host.clientHeight)
 
   if (instance.width !== nextWidth || instance.height !== nextHeight) {
     instance.resizeCanvas(nextWidth, nextHeight)
