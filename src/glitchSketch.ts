@@ -858,7 +858,7 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
       resizeIfNeeded(sketchInstance, options.host, true)
     }
 
-    const canvasStream = canvasElement.captureStream(30)
+    const canvasStream = canvasElement.captureStream(60)
     const audioTracks = recorderDestination.stream.getAudioTracks()
     const stream = new MediaStream([
       ...canvasStream.getVideoTracks(),
@@ -867,8 +867,10 @@ export async function createGlitchSketch(options: CreateGlitchSketchOptions) {
     const mimeType = getSupportedVideoMimeType()
     const recorder = new MediaRecorder(stream, {
       ...(mimeType ? { mimeType } : {}),
-      audioBitsPerSecond: 192_000,
-      videoBitsPerSecond: 5_000_000,
+      audioBitsPerSecond: 256_000,
+      // High-entropy glitch/noise content compresses poorly; a generous bitrate
+      // keeps the export close to the live view instead of blocky.
+      videoBitsPerSecond: 16_000_000,
     })
 
     mediaRecorder = recorder
