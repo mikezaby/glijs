@@ -110,7 +110,12 @@ const EMPTY_METRICS: GlitchMetrics = {
   chaos: 0,
 }
 
+// Prefer MP4/H.264 so exports play everywhere without conversion; fall back to
+// WebM on browsers whose MediaRecorder can't mux MP4 (older Chrome/Firefox).
 const VIDEO_MIME_TYPES = [
+  'video/mp4;codecs=avc1.640028,mp4a.40.2',
+  'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+  'video/mp4',
   'video/webm;codecs=vp9,opus',
   'video/webm;codecs=vp8,opus',
   'video/webm;codecs=h264,opus',
